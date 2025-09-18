@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="kr.or.ddit.common.chatbot.mapper.ChatbotMapper">
+
+	<select id="findAdmCodesByName" parameterType="String" resultType="kr.or.ddit.common.vo.code.CodeAdmDongVO">
+        SELECT ADM_CODE, ADM_NAME
+        FROM CODE_ADM_DONG
+        WHERE ADM_NAME LIKE #{dongName} || '%'
+    </select>
+    
+    <select id="findBizCodesByName" parameterType="String" resultType="kr.or.ddit.common.vo.code.CodeBizVO">
+        SELECT BIZ_CODE_ID, BIZ_NAME, BIZ_LEVEL
+        FROM CODE_BIZ
+        WHERE BIZ_NAME LIKE '%' || #{bizName} || '%'
+          AND BIZ_LEVEL IN (1, 2)
+    </select>
+    
+    <select id="selectDongStats" parameterType="map" resultType="map">
+        SELECT
+            (SELECT SUM(STATS_VALUE) FROM STATS_POPULATION WHERE ADM_CODE IN <foreach item="code" collection="admCodeList" open="(" separator="," close=")">#{code}</foreach> AND STATS_YEAR = #{statsYear} AND SGIS_CODE = 'population_total') AS population,
+            (SELECT SUM(STATS_VALUE) FROM STATS_HOUSEHOLD WHERE ADM_CODE IN <foreach item="code" collection="admCodeList" open="(" separator="," close=")">#{code}</foreach> AND STATS_YEAR = #{statsYear} AND SGIS_CODE = 'household_total') AS household,
+            (SELECT SUM(STATS_VALUE) FROM STATS_HOUSING WHERE ADM_CODE IN <foreach item="code" collection="admCodeList" open="(" separator="," close=")">#{code}</foreach> AND STATS_YEAR = #{statsYear} AND SGIS_CODE = 'housing_total') AS housing,
+            (SELECT AVG(AVG_PAYMENT_AMOUNT) FROM STATS_CREDIT_CARD WHERE ADM_CODE IN <foreach item="code" collection="admCodeList" open="(" separator="," close=")">#{code}</foreach> AND STATS_YEAR = #{statsYear}) AS creditCardAmount,
+            <choose>
+                <when test="bizCodeIdListL1 != null and !bizCodeIdListL1.isEmpty()">
+                    (SELECT SUM(STATS_VALUE) FROM STATS_BIZ_LARGE WHERE ADM_CODE IN <foreach item="code" collection="admCodeList" open="(" separator="," close=")">#{code}</foreach> AND BIZ_CODE_ID IN <foreach item="biz" collection="bizCodeIdListL1" open="(" separator="," close=")">#{biz}</foreach> AND STATS_YEAR = #{statsYear}) AS bizCount,
+                    (SELECT SUM(STATS_VALUE) FROM STATS_EMP_LARGE WHERE ADM_CODE IN <foreach item="code" collection="admCodeList" open="(" separator="," close=")">#{code}</foreach> AND BIZ_CODE_ID IN <foreach item="biz" collection="bizCodeIdListL1" open="(" separator="," close=")">#{biz}</foreach> AND STATS_YEAR = #{statsYear}) AS empCount
+                </when>
+                <when test="bizCodeIdListL2 != null and !bizCodeIdListL2.isEmpty()">
+                    (SELECT SUM(STATS_VALUE) FROM STATS_BIZ_MEDIUM WHERE ADM_CODE IN <foreach item="code" collection="admCodeList" open="(" separator="," close=")">#{code}</foreach> AND BIZ_CODE_ID IN <foreach item="biz" collection="bizCodeIdListL2" open="(" separator="," close=")">#{biz}</foreach> AND STATS_YEAR = #{statsYear}) AS bizCount,
+                    (SELECT SUM(STATS_VALUE) FROM STATS_EMP_MEDIUM WHERE ADM_CODE IN <foreach item="code" collection="admCodeList" open="(" separator="," close=")">#{code}</foreach> AND BIZ_CODE_ID IN <foreach item="biz" collection="bizCodeIdListL2" open="(" separator="," close=")">#{biz}</foreach> AND STATS_YEAR = #{statsYear}) AS empCount
+                </when>
+                <otherwise>
+                    (SELECT SUM(STATS_VALUE) FROM STATS_BIZ_LARGE WHERE ADM_CODE IN <foreach item="code" collection="admCodeList" open="(" separator="," close=")">#{code}</foreach> AND STATS_YEAR = #{statsYear}) AS bizCount,
+                    (SELECT SUM(STATS_VALUE) FROM STATS_EMP_LARGE WHERE ADM_CODE IN <foreach item="code" collection="admCodeList" open="(" separator="," close=")">#{code}</foreach> AND STATS_YEAR = #{statsYear}) AS empCount
+                </otherwise>
+            </choose>
+        FROM DUAL
+    </select>
+    
+    <select id="selectOverallStats" parameterType="map" resultType="map">
+        SELECT
+            (SELECT AVG(STATS_VALUE) FROM STATS_POPULATION WHERE STATS_YEAR = #{statsYear} AND SGIS_CODE = 'population_total') AS population,
+            (SELECT AVG(STATS_VALUE) FROM STATS_HOUSEHOLD WHERE STATS_YEAR = #{statsYear} AND SGIS_CODE = 'household_total') AS household,
+            (SELECT AVG(STATS_VALUE) FROM STATS_HOUSING WHERE STATS_YEAR = #{statsYear} AND SGIS_CODE = 'housing_total') AS housing,
+            (SELECT AVG(AVG_PAYMENT_AMOUNT) FROM STATS_CREDIT_CARD WHERE STATS_YEAR = #{statsYear}) AS creditCardAmount,
+            <choose>
+                <when test="bizCodeIdListL1 != null and !bizCodeIdListL1.isEmpty()">
+                    (SELECT AVG(STATS_VALUE) FROM STATS_BIZ_LARGE WHERE BIZ_CODE_ID IN <foreach item="biz" collection="bizCodeIdListL1" open="(" separator="," close=")">#{biz}</foreach> AND STATS_YEAR = #{statsYear}) AS bizCount,
+                    (SELECT AVG(STATS_VALUE) FROM STATS_EMP_LARGE WHERE BIZ_CODE_ID IN <foreach item="biz" collection="bizCodeIdListL1" open="(" separator="," close=")">#{biz}</foreach> AND STATS_YEAR = #{statsYear}) AS empCount
+                </when>
+                <when test="bizCodeIdListL2 != null and !bizCodeIdListL2.isEmpty()">
+                    (SELECT AVG(STATS_VALUE) FROM STATS_BIZ_MEDIUM WHERE BIZ_CODE_ID IN <foreach item="biz" collection="bizCodeIdListL2" open="(" separator="," close=")">#{biz}</foreach> AND STATS_YEAR = #{statsYear}) AS bizCount,
+                    (SELECT AVG(STATS_VALUE) FROM STATS_EMP_MEDIUM WHERE BIZ_CODE_ID IN <foreach item="biz" collection="bizCodeIdListL2" open="(" separator="," close=")">#{biz}</foreach> AND STATS_YEAR = #{statsYear}) AS empCount
+                </when>
+                <otherwise>
+                    (SELECT AVG(T.TOTAL_BIZ) FROM (SELECT ADM_CODE, SUM(STATS_VALUE) AS TOTAL_BIZ FROM STATS_BIZ_LARGE WHERE STATS_YEAR = #{statsYear} GROUP BY ADM_CODE) T) AS bizCount,
+                    (SELECT AVG(T.TOTAL_EMP) FROM (SELECT ADM_CODE, SUM(STATS_VALUE) AS TOTAL_EMP FROM STATS_EMP_LARGE WHERE STATS_YEAR = #{statsYear} GROUP BY ADM_CODE) T) AS empCount
+                </otherwise>
+            </choose>
+        FROM DUAL
+    </select>
+
+</mapper>

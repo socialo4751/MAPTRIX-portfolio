@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper
+	namespace="kr.or.ddit.notification.mapper.NotificationMapper">
+
+	<resultMap id="NotificationMap"
+		type="kr.or.ddit.notification.vo.UserNotifiedVO">
+		<id property="notifyId" column="NOTIFY_ID" />
+		<result property="userId" column="USER_ID" />
+		<result property="message" column="MESSAGE" />
+		<result property="isRead" column="IS_READ" />
+		<result property="entityType" column="ENTITY_TYPE" />
+		<result property="entityId" column="ENTITY_ID" />
+		<result property="targetUrl" column="TARGET_URL" />
+		<result property="createdAt" column="CREATED_AT" />
+		<result property="deletedAt" column="DELETED_AT" />
+	</resultMap>
+
+	<insert id="insertNotification"
+		parameterType="kr.or.ddit.notification.vo.UserNotifiedVO">
+		<selectKey keyProperty="notifyId" resultType="int"
+			order="BEFORE">
+			SELECT SEQ_USER_NOTIFIED.NEXTVAL FROM DUAL
+		</selectKey>
+		INSERT INTO USER_NOTIFIED (
+		NOTIFY_ID, USER_ID, MESSAGE, ENTITY_TYPE, ENTITY_ID, TARGET_URL, CREATED_AT
+		) VALUES (
+		#{notifyId}, #{userId}, #{message}, #{entityType}, #{entityId}, #{targetUrl},
+		SYSDATE
+		)
+	</insert>
+
+	<!-- 미읽음 20개 -->
+	<select id="selectNotificationsByUserId" parameterType="string"
+		resultMap="NotificationMap">
+		SELECT
+		NOTIFY_ID, USER_ID, MESSAGE, IS_READ, ENTITY_TYPE, ENTITY_ID, TARGET_URL,
+		CREATED_AT, DELETED_AT
+		FROM USER_NOTIFIED
+		WHERE USER_ID = #{userId}
+		AND DELETED_AT IS NULL
+		AND IS_READ = 'N'
+		ORDER BY CREATED_AT DESC
+		FETCH FIRST 20 ROWS ONLY
+	</select>
+
+	<select id="countUnreadNotificationsByUserId"
+		parameterType="string" resultType="int">
+		SELECT COUNT(*)
+		FROM USER_NOTIFIED
+		WHERE USER_ID = #{userId}
+		AND IS_READ = 'N'
+		AND DELETED_AT IS NULL
+	</select>
+
+	<update id="markAllAsReadByUserId" parameterType="string">
+		UPDATE USER_NOTIFIED
+		SET IS_READ = 'Y'
+		WHERE USER_ID = #{userId}
+		AND IS_READ = 'N'
+		AND DELETED_AT IS NULL
+	</update>
+
+	<!-- 기존: notifyId만 조건 -->
+	<update id="markAsRead" parameterType="int">
+		UPDATE USER_NOTIFIED
+		SET IS_READ = 'Y'
+		WHERE NOTIFY_ID = #{notifyId}
+	</update>
+
+	<!-- 권장: 소유자까지 확인 -->
+	<update id="markAsReadByIdAndUser" parameterType="map">
+		UPDATE USER_NOTIFIED
+		SET IS_READ = 'Y'
+		WHERE NOTIFY_ID = #{notifyId}
+		AND USER_ID = #{userId}
+		AND IS_READ = 'N'
+		AND DELETED_AT IS NULL
+	</update>
+
+
+</mapper>

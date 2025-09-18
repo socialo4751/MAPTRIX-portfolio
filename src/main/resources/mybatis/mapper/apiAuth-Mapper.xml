@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.ddit.openapi.auth.mapper.ApiAuthMapper">
+
+    <select id="findSubscriptionByApiKey" parameterType="String" resultType="kr.or.ddit.common.vo.openapi.ApiSubscriptionsVO">
+        SELECT
+            SUBSCRIPTION_ID
+            ,USER_ID
+            ,API_ID
+            ,API_KEY
+            ,STARTED_AT
+            ,EXPIRED_AT
+        FROM
+            API_SUBSCRIPTIONS
+        WHERE
+            API_KEY = #{apiKey}
+            AND (EXPIRED_AT IS NULL OR EXPIRED_AT > SYSDATE)
+    </select>
+
+    <select id="selectDailyLimitByApiId" parameterType="long" resultType="long">
+        SELECT 
+        	DAILY_CALL_LIMIT
+        FROM 
+        	API_SERVICE
+        WHERE 
+        	API_ID = #{apiId}
+    </select>
+
+</mapper>

@@ -1,0 +1,354 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.ddit.user.my.community.mapper.MypageMapper">
+
+    <select id="selectPostsByBizCode" parameterType="map"
+        resultType="kr.or.ddit.community.free.vo.CommFreePostVO">
+        SELECT
+            POST_ID, USER_ID, CAT_CODE_ID, TITLE, VIEW_COUNT, CREATED_AT, RNUM
+        FROM (
+            SELECT
+                ROWNUM AS PAGINATION_RNUM, A.*
+            FROM (
+                SELECT
+                    A.POST_ID, A.USER_ID
+                    , (SELECT B.BIZ_NAME FROM CODE_BIZ B WHERE B.BIZ_CODE_ID = A.CAT_CODE_ID) CAT_CODE_ID
+                    , A.TITLE, A.VIEW_COUNT, A.CREATED_AT,
+                    ROW_NUMBER() OVER (PARTITION BY A.CAT_CODE_ID ORDER BY A.POST_ID ASC) AS RNUM
+                FROM COMM_FREE_POST A
+                WHERE 1=1
+                AND A.IS_DELETED = 'N'
+                <if test="userId != null and userId != ''">
+                    AND A.USER_ID = #{userId}
+                </if>
+                <if test="keyword != null and keyword != ''">
+                    AND (A.TITLE LIKE '%' || #{keyword} || '%' OR DBMS_LOB.INSTR(A.CONTENT, #{keyword}) > 0)
+                </if>
+            ) A
+        )
+        WHERE PAGINATION_RNUM BETWEEN #{startRow} AND #{endRow}
+    </select>
+
+    <select id="countPostsByBizCode" parameterType="map" resultType="int">
+        SELECT COUNT(*)
+        FROM COMM_FREE_POST A
+        WHERE 1=1
+        AND A.IS_DELETED = 'N'
+        <if test="userId != null and userId != ''">
+            AND A.USER_ID = #{userId}
+        </if>
+        <if test="keyword != null and keyword != ''">
+            AND (A.TITLE LIKE '%' || #{keyword} || '%' OR DBMS_LOB.INSTR(A.CONTENT, #{keyword}) > 0)
+        </if>
+    </select>
+    
+    <select id="selectPostById" parameterType="int" resultType="kr.or.ddit.community.free.vo.CommFreePostVO">
+        SELECT
+            POST_ID, USER_ID, CAT_CODE_ID, TITLE, CONTENT, VIEW_COUNT, CREATED_AT, UPDATED_AT, FILE_GROUP_NO
+        FROM COMM_FREE_POST
+        WHERE POST_ID = #{postId} AND IS_DELETED = 'N'
+    </select>
+    
+    <update id="incrementViewCount" parameterType="int">
+        UPDATE COMM_FREE_POST
+        SET VIEW_COUNT = NVL(VIEW_COUNT, 0) + 1
+        WHERE POST_ID = #{postId}
+    </update>
+    
+    <insert id="insertPost" parameterType="kr.or.ddit.community.free.vo.CommFreePostVO">
+        <selectKey keyProperty="postId" order="BEFORE" resultType="int">
+            SELECT COMM_FREE_POST_SEQ.NEXTVAL FROM DUAL
+        </selectKey>
+        INSERT INTO COMM_FREE_POST (
+            POST_ID, USER_ID, CAT_CODE_ID, TITLE, CONTENT, FILE_GROUP_NO
+        ) VALUES (
+            #{postId}, #{userId}, #{catCodeId}, #{title}, #{content}, #{fileGroupNo}
+        )
+    </insert>
+
+    <update id="updatePost"
+            parameterType="kr.or.ddit.community.free.vo.CommFreePostVO">
+        UPDATE COMM_FREE_POST
+        <set>
+            <if test="title != null and title != ''">TITLE = #{title},</if>
+            <if test="content != null and content != ''">CONTENT = #{content},</if>
+            <if test="fileGroupNo != null and fileGroupNo > 0">FILE_GROUP_NO = #{fileGroupNo},</if>
+            UPDATED_AT = SYSDATE
+        </set>
+        WHERE POST_ID = #{postId}
+    </update>
+
+    <update id="softDeletePostById" parameterType="int">
+        UPDATE COMM_FREE_POST
+        SET IS_DELETED = 'Y',
+            UPDATED_AT = SYSDATE
+        WHERE POST_ID = #{postId}
+    </update>
+    
+    <!-- 게시글 수 조회 (검색 조건 추가) -->
+    <select id="countPostsByUserId" parameterType="map" resultType="int">
+        SELECT COUNT(*)
+        FROM COMM_FREE_POST
+        WHERE USER_ID = #{userId} AND IS_DELETED = 'N'
+        <!-- 검색 조건 추가 -->
+        <if test="searchKeyword != null and searchKeyword != ''">
+            <choose>
+                <when test="searchType == 'title'">
+                    AND TITLE LIKE '%' || #{searchKeyword} || '%'
+                </when>
+                <when test="searchType == 'content'">
+                    AND DBMS_LOB.INSTR(CONTENT, #{searchKeyword}) > 0
+                </when>
+                <when test="searchType == 'writer'">
+                    AND USER_ID LIKE '%' || #{searchKeyword} || '%'
+                </when>
+                <otherwise>
+                    AND (TITLE LIKE '%' || #{searchKeyword} || '%' 
+                         OR DBMS_LOB.INSTR(CONTENT, #{searchKeyword}) > 0
+                         OR USER_ID LIKE '%' || #{searchKeyword} || '%')
+                </otherwise>
+            </choose>
+        </if>
+    </select>
+    
+    <!-- 게시글 목록 조회 (검색 조건 추가) -->
+    <select id="selectPostsByUserId" parameterType="map"
+        resultType="kr.or.ddit.community.free.vo.CommFreePostVO">
+        SELECT
+            S.RNUM, S.POST_ID, S.USER_ID, S.CAT_CODE_ID, S.TITLE, S.VIEW_COUNT, S.CREATED_AT
+            , S.BIZ_NAME
+        FROM (
+            SELECT
+                ROWNUM AS RNUM,
+                T.POST_ID, T.USER_ID, T.CAT_CODE_ID, T.TITLE, T.VIEW_COUNT, T.CREATED_AT
+                , T.BIZ_NAME
+            FROM (
+                SELECT
+                      A.POST_ID, A.USER_ID, A.CAT_CODE_ID
+                    , A.TITLE, A.VIEW_COUNT, A.CREATED_AT
+                    , (SELECT B.BIZ_NAME FROM CODE_BIZ B WHERE B.BIZ_CODE_ID = A.CAT_CODE_ID) BIZ_NAME
+                FROM COMM_FREE_POST A
+                WHERE A.USER_ID = #{userId} AND A.IS_DELETED = 'N'
+                <!-- 검색 조건 추가 -->
+                <if test="searchKeyword != null and searchKeyword != ''">
+                    <choose>
+                        <when test="searchType == 'title'">
+                            AND A.TITLE LIKE '%' || #{searchKeyword} || '%'
+                        </when>
+                        <when test="searchType == 'content'">
+                            AND DBMS_LOB.INSTR(A.CONTENT, #{searchKeyword}) > 0
+                        </when>
+                        <when test="searchType == 'writer'">
+                            AND A.USER_ID LIKE '%' || #{searchKeyword} || '%'
+                        </when>
+                        <otherwise>
+                            AND (A.TITLE LIKE '%' || #{searchKeyword} || '%' 
+                                 OR DBMS_LOB.INSTR(A.CONTENT, #{searchKeyword}) > 0
+                                 OR A.USER_ID LIKE '%' || #{searchKeyword} || '%')
+                        </otherwise>
+                    </choose>
+                </if>
+                ORDER BY A.CREATED_AT DESC
+            ) T
+        ) S
+        <if test="startRow != null and endRow != null">
+            WHERE S.RNUM BETWEEN #{startRow} AND #{endRow}
+        </if>
+    </select>
+
+    <!-- 댓글 수 조회 (검색 조건 추가) -->
+    <select id="countCommentsByUserId" parameterType="map" resultType="int">
+        SELECT COUNT(*)
+        FROM COMM_FREE_COMMENT
+        WHERE USER_ID = #{userId} AND IS_DELETED = 'N'
+        <!-- 검색 조건 추가 -->
+        <if test="searchKeyword != null and searchKeyword != ''">
+            <choose>
+                <when test="searchType == 'content'">
+                    AND DBMS_LOB.INSTR(CONTENT, #{searchKeyword}) > 0
+                </when>
+                <when test="searchType == 'writer'">
+                    AND USER_ID LIKE '%' || #{searchKeyword} || '%'
+                </when>
+                <when test="searchType == 'title'">
+                    <!-- 댓글의 경우 제목 검색 시 내용으로 검색 -->
+                    AND DBMS_LOB.INSTR(CONTENT, #{searchKeyword}) > 0
+                </when>
+                <otherwise>
+                    AND (DBMS_LOB.INSTR(CONTENT, #{searchKeyword}) > 0
+                         OR USER_ID LIKE '%' || #{searchKeyword} || '%')
+                </otherwise>
+            </choose>
+        </if>
+    </select>
+    
+    <!-- 댓글 목록 조회 (검색 조건 추가) -->
+    <select id="selectCommentsByUserId" parameterType="map" resultType="kr.or.ddit.community.free.vo.CommFreeCommentVO">
+        SELECT S.*
+        FROM (
+            SELECT ROW_NUMBER() OVER(ORDER BY A.CREATED_AT DESC) RNUM
+                ,  A.COMMENT_ID, null POST_ID, A.POST_ID POST_ID2, A.USER_ID, A.CONTENT, A.CREATED_AT
+                , (SELECT B.BIZ_NAME 
+                FROM CODE_BIZ B 
+                WHERE B.BIZ_CODE_ID = 
+                    (SELECT C.CAT_CODE_ID FROM COMM_FREE_POST C WHERE C.POST_ID = A.POST_ID)) BIZ_NAME
+            FROM COMM_FREE_COMMENT A
+            WHERE A.USER_ID = #{userId} AND A.IS_DELETED = 'N'
+            <!-- 검색 조건 추가 -->
+            <if test="searchKeyword != null and searchKeyword != ''">
+                <choose>
+                    <when test="searchType == 'content'">
+                        AND DBMS_LOB.INSTR(A.CONTENT, #{searchKeyword}) > 0
+                    </when>
+                    <when test="searchType == 'writer'">
+                        AND A.USER_ID LIKE '%' || #{searchKeyword} || '%'
+                    </when>
+                    <when test="searchType == 'title'">
+                        <!-- 댓글의 경우 제목 검색 시 내용으로 검색 -->
+                        AND DBMS_LOB.INSTR(A.CONTENT, #{searchKeyword}) > 0
+                    </when>
+                    <otherwise>
+                        AND (DBMS_LOB.INSTR(A.CONTENT, #{searchKeyword}) > 0
+                             OR A.USER_ID LIKE '%' || #{searchKeyword} || '%')
+                    </otherwise>
+                </choose>
+            </if>
+        ) S
+        <if test="startRow != null and endRow != null">
+            WHERE S.RNUM BETWEEN #{startRow} AND #{endRow}
+        </if>
+        ORDER BY S.CREATED_AT DESC
+    </select>
+    
+    <!-- 통합 활동 수 조회 (검색 조건 포함) -->
+    <select id="countAllActivitiesByUserId" parameterType="map" resultType="int">
+        SELECT COUNT(*) FROM (
+            SELECT POST_ID as ID
+            FROM COMM_FREE_POST
+            WHERE USER_ID = #{userId} AND IS_DELETED = 'N'
+            <if test="searchKeyword != null and searchKeyword != ''">
+                <choose>
+                    <when test="searchType == 'title'">
+                        AND TITLE LIKE '%' || #{searchKeyword} || '%'
+                    </when>
+                    <when test="searchType == 'content'">
+                        AND DBMS_LOB.INSTR(CONTENT, #{searchKeyword}) > 0
+                    </when>
+                    <when test="searchType == 'writer'">
+                        AND USER_ID LIKE '%' || #{searchKeyword} || '%'
+                    </when>
+                    <otherwise>
+                        AND (TITLE LIKE '%' || #{searchKeyword} || '%' 
+                             OR DBMS_LOB.INSTR(CONTENT, #{searchKeyword}) > 0
+                             OR USER_ID LIKE '%' || #{searchKeyword} || '%')
+                    </otherwise>
+                </choose>
+            </if>
+            
+            UNION ALL
+            
+            SELECT COMMENT_ID as ID
+            FROM COMM_FREE_COMMENT
+            WHERE USER_ID = #{userId} AND IS_DELETED = 'N'
+            <if test="searchKeyword != null and searchKeyword != ''">
+                <choose>
+                    <when test="searchType == 'content'">
+                        AND DBMS_LOB.INSTR(CONTENT, #{searchKeyword}) > 0
+                    </when>
+                    <when test="searchType == 'writer'">
+                        AND USER_ID LIKE '%' || #{searchKeyword} || '%'
+                    </when>
+                    <when test="searchType == 'title'">
+                        AND DBMS_LOB.INSTR(CONTENT, #{searchKeyword}) > 0
+                    </when>
+                    <otherwise>
+                        AND (DBMS_LOB.INSTR(CONTENT, #{searchKeyword}) > 0
+                             OR USER_ID LIKE '%' || #{searchKeyword} || '%')
+                    </otherwise>
+                </choose>
+            </if>
+        )
+    </select>
+    
+    <!-- 통합 활동 목록 조회 (검색 조건 포함) -->
+    <select id="selectAllActivitiesByUserId" parameterType="map" resultType="map">
+        SELECT * FROM (
+            SELECT ROWNUM AS RNUM, T.* FROM (
+                SELECT 
+                    'POST' AS ACTIVITY_TYPE,
+                    POST_ID AS ID,
+                    CAST(null AS NUMBER) AS POST_ID,
+                    POST_ID AS POST_ID2,
+                    USER_ID,
+                    CAT_CODE_ID,
+                    TITLE,
+                    DBMS_LOB.SUBSTR(CONTENT, 4000, 1) AS CONTENT,  
+                    VIEW_COUNT,
+                    CREATED_AT,
+                    (SELECT B.BIZ_NAME FROM CODE_BIZ B WHERE B.BIZ_CODE_ID = CAT_CODE_ID) AS BIZ_NAME
+                FROM COMM_FREE_POST
+                WHERE USER_ID = #{userId} AND IS_DELETED = 'N'
+                <if test="searchKeyword != null and searchKeyword != ''">
+                    <choose>
+                        <when test="searchType == 'title'">
+                            AND TITLE LIKE '%' || #{searchKeyword} || '%'
+                        </when>
+                        <when test="searchType == 'content'">
+                            AND DBMS_LOB.INSTR(CONTENT, #{searchKeyword}) > 0
+                        </when>
+                        <when test="searchType == 'writer'">
+                            AND USER_ID LIKE '%' || #{searchKeyword} || '%'
+                        </when>
+                        <otherwise>
+                            AND (TITLE LIKE '%' || #{searchKeyword} || '%' 
+                                 OR DBMS_LOB.INSTR(CONTENT, #{searchKeyword}) > 0
+                                 OR USER_ID LIKE '%' || #{searchKeyword} || '%')
+                        </otherwise>
+                    </choose>
+                </if>
+                
+                UNION ALL
+                
+                SELECT 
+                    'COMMENT' AS ACTIVITY_TYPE,
+                    COMMENT_ID AS ID,
+                    POST_ID,
+                    POST_ID AS POST_ID2,
+                    USER_ID,
+                    CAST(null AS VARCHAR2(50)) AS CAT_CODE_ID, 
+                    CAST(null AS VARCHAR2(200)) AS TITLE,       
+                    DBMS_LOB.SUBSTR(CONTENT, 4000, 1) AS CONTENT,  
+                    CAST(null AS NUMBER) AS VIEW_COUNT,       
+                    CREATED_AT,
+                    (SELECT B.BIZ_NAME 
+                     FROM CODE_BIZ B 
+                     WHERE B.BIZ_CODE_ID = (SELECT C.CAT_CODE_ID FROM COMM_FREE_POST C WHERE C.POST_ID = COMM_FREE_COMMENT.POST_ID)) AS BIZ_NAME
+                FROM COMM_FREE_COMMENT
+                WHERE USER_ID = #{userId} AND IS_DELETED = 'N'
+                <if test="searchKeyword != null and searchKeyword != ''">
+                    <choose>
+                        <when test="searchType == 'content'">
+                            AND DBMS_LOB.INSTR(CONTENT, #{searchKeyword}) > 0
+                        </when>
+                        <when test="searchType == 'writer'">
+                            AND USER_ID LIKE '%' || #{searchKeyword} || '%'
+                        </when>
+                        <when test="searchType == 'title'">
+                            AND DBMS_LOB.INSTR(CONTENT, #{searchKeyword}) > 0
+                        </when>
+                        <otherwise>
+                            AND (DBMS_LOB.INSTR(CONTENT, #{searchKeyword}) > 0
+                                 OR USER_ID LIKE '%' || #{searchKeyword} || '%')
+                        </otherwise>
+                    </choose>
+                </if>
+                
+                ORDER BY CREATED_AT DESC
+            ) T
+        )
+        <if test="startRow != null and endRow != null">
+            WHERE RNUM BETWEEN #{startRow} AND #{endRow}
+        </if>
+    </select>
+
+</mapper>

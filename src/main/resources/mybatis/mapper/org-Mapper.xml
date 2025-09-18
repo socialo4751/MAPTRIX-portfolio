@@ -1,0 +1,177 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.ddit.intro.org.mapper.OrgEmpMapper">
+
+    <resultMap id="orgEmpMap" type="kr.or.ddit.intro.org.vo.OrgEmpVO">
+        <id property="empId" column="EMP_ID"/>
+        <result property="deptId" column="DEPT_ID"/>
+        <result property="empPosition" column="EMP_POSITION"/>
+        <result property="empImage" column="EMP_IMAGE"/>
+        <result property="empExt" column="EMP_EXT"/>
+        <result property="empName" column="EMP_NAME"/>
+        <result property="email" column="EMAIL"/>
+        <result property="deptName" column="DEPT_NAME"/>
+    </resultMap>
+
+    <select id="selectOrgEmpList" resultMap="orgEmpMap">
+        SELECT E.EMP_ID,
+               E.DEPT_ID,
+               E.EMP_POSITION,
+               E.EMP_IMAGE,
+               E.EMP_EXT,
+               U.NAME      AS EMP_NAME,
+               U.EMAIL     AS EMAIL,
+               D.DEPT_NAME AS DEPT_NAME
+        FROM ORG_EMP E
+                 JOIN USERS U ON E.EMP_ID = U.USER_ID
+                 LEFT JOIN ORG_DEPT D ON E.DEPT_ID = D.DEPT_ID
+        ORDER BY E.EMP_ID
+    </select>
+    <select id="selectAllEmployees" resultType="kr.or.ddit.intro.org.vo.OrgEmpVO">
+        SELECT e.emp_id AS empId,
+               u.name   AS empName
+        FROM org_emp e
+                 JOIN users u ON e.emp_id = u.user_id
+        ORDER BY e.emp_id
+    </select>
+
+    <!-- ▼ 부서명 단건 -->
+    <select id="selectDeptName" parameterType="int" resultType="string">
+        SELECT d.DEPT_NAME
+        FROM ORG_DEPT d
+        WHERE d.DEPT_ID = #{deptId}
+    </select>
+
+    <!-- ▼ 부서별 구성원 -->
+    <select id="selectEmployeesByDept" parameterType="int" resultMap="orgEmpMap">
+        SELECT E.EMP_ID,
+               E.DEPT_ID,
+               E.EMP_POSITION,
+               E.EMP_IMAGE,
+               E.EMP_EXT,
+               U.NAME      AS EMP_NAME,
+               U.EMAIL     AS EMAIL,
+               D.DEPT_NAME AS DEPT_NAME
+        FROM ORG_EMP E
+                 JOIN USERS U ON E.EMP_ID = U.USER_ID
+                 LEFT JOIN ORG_DEPT D ON E.DEPT_ID = D.DEPT_ID
+        WHERE E.DEPT_ID = #{deptId}
+        ORDER BY CASE E.EMP_POSITION
+                     WHEN '임원' THEN 1
+                     WHEN '부장' THEN 2
+                     WHEN '차장' THEN 3
+                     WHEN '팀장' THEN 4
+                     WHEN '대리' THEN 5
+                     WHEN '주임' THEN 6
+                     WHEN '사원' THEN 7
+                     ELSE 99
+                     END,
+                 U.NAME
+    </select>
+
+    <!-- org-Mapper.xml : 검색 동적 SQL 추가 -->
+    <select id="searchEmployees" resultType="kr.or.ddit.intro.org.vo.OrgEmpVO">
+        SELECT
+        E.EMP_ID,
+        E.DEPT_ID,
+        E.EMP_POSITION,
+        E.EMP_IMAGE,
+        E.EMP_EXT,
+        U.NAME AS EMP_NAME,
+        U.EMAIL AS EMAIL,
+        D.DEPT_NAME AS DEPT_NAME
+        FROM ORG_EMP E
+        JOIN USERS U ON E.EMP_ID = U.USER_ID
+        LEFT JOIN ORG_DEPT D ON E.DEPT_ID = D.DEPT_ID
+        <where>
+            <if test="deptId != null">
+                E.DEPT_ID = #{deptId}
+            </if>
+
+            <if test="keyword != null and keyword != ''">
+                <if test="deptId != null">AND</if>
+                <bind name="kw" value="'%' || keyword || '%'"/>
+                (
+                UPPER(U.NAME) LIKE UPPER('%' || #{keyword} || '%')
+                OR UPPER(U.EMAIL) LIKE UPPER('%' || #{keyword} || '%')
+                OR UPPER(D.DEPT_NAME) LIKE UPPER('%' || #{keyword} || '%')
+                OR UPPER(E.EMP_POSITION) LIKE UPPER('%' || #{keyword} || '%')
+                )
+            </if>
+        </where>
+        ORDER BY
+        CASE E.EMP_POSITION
+        WHEN '임원' THEN 1
+        WHEN '부장' THEN 2
+        WHEN '차장' THEN 3
+        WHEN '팀장' THEN 4
+        WHEN '대리' THEN 5
+        WHEN '주임' THEN 6
+        WHEN '사원' THEN 7
+        ELSE 99
+        END,
+        U.NAME
+    </select>
+
+    <select id="countEmployees" resultType="int">
+        SELECT COUNT(1)
+        FROM ORG_EMP E
+        JOIN USERS U ON E.EMP_ID = U.USER_ID
+        LEFT JOIN ORG_DEPT D ON E.DEPT_ID = D.DEPT_ID
+        <where>
+            <if test="deptId != null">
+                E.DEPT_ID = #{deptId}
+            </if>
+            <if test="keyword != null and keyword != ''">
+                <if test="deptId != null">AND</if>
+                (
+                UPPER(U.NAME) LIKE UPPER('%' || #{keyword} || '%')
+                OR UPPER(U.EMAIL) LIKE UPPER('%' || #{keyword} || '%')
+                OR UPPER(D.DEPT_NAME) LIKE UPPER('%' || #{keyword} || '%')
+                OR UPPER(E.EMP_POSITION) LIKE UPPER('%' || #{keyword} || '%')
+                )
+            </if>
+        </where>
+    </select>
+    <!-- 페이징 목록 -->
+    <select id="searchEmployeesPaged" resultMap="orgEmpMap">
+        SELECT *
+        FROM (
+        SELECT
+        E.EMP_ID,
+        E.DEPT_ID,
+        E.EMP_POSITION,
+        E.EMP_IMAGE,
+        E.EMP_EXT,
+        U.NAME AS EMP_NAME,
+        U.EMAIL AS EMAIL,
+        D.DEPT_NAME AS DEPT_NAME,
+        ROW_NUMBER() OVER(
+        ORDER BY
+        CASE E.EMP_POSITION
+        WHEN '임원' THEN 1 WHEN '부장' THEN 2 WHEN '차장' THEN 3
+        WHEN '팀장' THEN 4 WHEN '대리' THEN 5 WHEN '주임' THEN 6
+        WHEN '사원' THEN 7 ELSE 99 END,
+        U.NAME
+        ) AS RN
+        FROM ORG_EMP E
+        JOIN USERS U ON E.EMP_ID = U.USER_ID
+        LEFT JOIN ORG_DEPT D ON E.DEPT_ID = D.DEPT_ID
+        <where>
+            <if test="deptId != null">
+                E.DEPT_ID = #{deptId}
+            </if>
+            <if test="keyword != null &amp;&amp; keyword != ''">
+                <if test="deptId != null">AND</if>
+                (
+                UPPER(U.NAME) LIKE UPPER('%' || #{keyword} || '%')
+                OR UPPER(U.EMAIL) LIKE UPPER('%' || #{keyword} || '%')
+                OR UPPER(D.DEPT_NAME) LIKE UPPER('%' || #{keyword} || '%')
+                OR UPPER(E.EMP_POSITION) LIKE UPPER('%' || #{keyword} || '%')
+                )
+            </if>
+        </where>
+        ) X
+        WHERE X.RN BETWEEN #{startRow} AND #{endRow}
+    </select>
+</mapper>

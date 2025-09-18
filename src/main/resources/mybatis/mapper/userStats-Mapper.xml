@@ -1,0 +1,322 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="kr.or.ddit.admin.stats.user.mapper.UserStatsMapper">
+
+  <!-- 1) KPI 요약 -->
+  <select id="selectKpiSummaryFromStatsDaily" resultType="map">
+    <![CDATA[
+      WITH
+      P AS (
+        SELECT
+          SUM(NEW_USERS)         AS P_NEW_USERS,
+          SUM(DAU)               AS P_DAU,
+          SUM(ANALYSIS_ACTIONS)  AS P_ANALYSIS,
+          SUM(COMMUNITY_ACTIONS) AS P_COMMUNITY,
+          SUM(STAMP_ACTIONS)     AS P_STAMP,
+          SUM(API_CALLS)         AS P_API,
+          SUM(DRAWING_ACTIONS)   AS P_DRAWING
+        FROM STATS_USER_DAILY
+        WHERE STAT_DATE >= TO_DATE(#{from}, 'YYYY-MM-DD') - (TO_DATE(#{to}, 'YYYY-MM-DD') - TO_DATE(#{from}, 'YYYY-MM-DD') + 1)
+          AND STAT_DATE <  TO_DATE(#{from}, 'YYYY-MM-DD')
+      ),
+      C AS (
+        SELECT
+          SUM(NEW_USERS)         AS C_NEW_USERS,
+          SUM(DAU)               AS C_DAU,
+          SUM(ANALYSIS_ACTIONS)  AS C_ANALYSIS,
+          SUM(COMMUNITY_ACTIONS) AS C_COMMUNITY,
+          SUM(STAMP_ACTIONS)     AS C_STAMP,
+          SUM(API_CALLS)         AS C_API,
+          SUM(DRAWING_ACTIONS)   AS C_DRAWING
+        FROM STATS_USER_DAILY
+        WHERE STAT_DATE >= TO_DATE(#{from}, 'YYYY-MM-DD')
+          AND STAT_DATE <  TO_DATE(#{to},   'YYYY-MM-DD') + 1
+      )
+      SELECT
+        C_NEW_USERS,  P_NEW_USERS,
+        C_DAU,        P_DAU,
+        C_ANALYSIS,   P_ANALYSIS,
+        C_COMMUNITY,  P_COMMUNITY,
+        C_STAMP,      P_STAMP,
+        C_API,        P_API,
+        C_DRAWING,    P_DRAWING
+      FROM C, P
+    ]]>
+  </select>
+
+  <!-- 2) 상권분석 사용량 -->
+  <select id="selectAnalysisBreakdown" resultType="map">
+    <![CDATA[
+      SELECT
+        SUM(CASE WHEN FEATURE = 'ANALYSIS_SIMPLE'   AND EVENT_TYPE IN ('VIEW','ACTION') THEN 1 ELSE 0 END) AS SIMPLE_CNT,
+        SUM(CASE WHEN FEATURE = 'ANALYSIS_DETAILED' AND EVENT_TYPE IN ('VIEW','ACTION') THEN 1 ELSE 0 END) AS DETAILED_CNT
+      FROM LOG_USER_EVENT
+      WHERE RUN_AT >= TO_DATE(#{from}, 'YYYY-MM-DD')
+        AND RUN_AT <  TO_DATE(#{to},   'YYYY-MM-DD') + 1
+    ]]>
+  </select>
+
+  <!-- 3) OpenAPI 호출량 -->
+  <select id="selectOpenApiCallsByFeature" resultType="map">
+    <![CDATA[
+      SELECT FEATURE, COUNT(*) AS CNT
+      FROM LOG_USER_EVENT
+      WHERE RUN_AT >= TO_DATE(#{from}, 'YYYY-MM-DD')
+        AND RUN_AT <  TO_DATE(#{to},   'YYYY-MM-DD') + 1
+        AND EVENT_TYPE = 'CALL'
+        AND FEATURE LIKE 'OPENAPI_%'
+      GROUP BY FEATURE
+      ORDER BY FEATURE
+    ]]>
+  </select>
+
+  <!-- 4) 커뮤니티 CUD(게시글) -->
+  <select id="selectCommunityPostCounts" resultType="map">
+    <![CDATA[
+      SELECT FEATURE,
+             SUM(CASE WHEN EVENT_TYPE='CREATE' THEN 1 ELSE 0 END) AS C_CNT,
+             SUM(CASE WHEN EVENT_TYPE='UPDATE' THEN 1 ELSE 0 END) AS U_CNT,
+             SUM(CASE WHEN EVENT_TYPE='DELETE' THEN 1 ELSE 0 END) AS D_CNT
+      FROM LOG_USER_EVENT
+      WHERE RUN_AT >= TO_DATE(#{from}, 'YYYY-MM-DD')
+        AND RUN_AT <  TO_DATE(#{to},   'YYYY-MM-DD') + 1
+        AND FEATURE IN ('FREE','REVIEW','SHOW')
+        AND EVENT_TYPE IN ('CREATE','UPDATE','DELETE')
+      GROUP BY FEATURE
+    ]]>
+  </select>
+
+  <!-- 4) 커뮤니티 CUD(댓글) -->
+  <select id="selectCommunityCommentCounts" resultType="map">
+    <![CDATA[
+      SELECT FEATURE,
+             SUM(CASE WHEN EVENT_TYPE='CREATE' THEN 1 ELSE 0 END) AS C_CNT,
+             SUM(CASE WHEN EVENT_TYPE='UPDATE' THEN 1 ELSE 0 END) AS U_CNT,
+             SUM(CASE WHEN EVENT_TYPE='DELETE' THEN 1 ELSE 0 END) AS D_CNT
+      FROM LOG_USER_EVENT
+      WHERE RUN_AT >= TO_DATE(#{from}, 'YYYY-MM-DD')
+        AND RUN_AT <  TO_DATE(#{to},   'YYYY-MM-DD') + 1
+        AND FEATURE IN ('FREE_COMMENT','REVIEW_COMMENT','SHOW_COMMENT')
+        AND EVENT_TYPE IN ('CREATE','UPDATE','DELETE')
+      GROUP BY FEATURE
+    ]]>
+  </select>
+
+  <!-- 5) 디자인 -->
+  <select id="selectDesignCounts" resultType="map">
+    <![CDATA[
+      SELECT
+        SUM(CASE WHEN EVENT_TYPE='SAVE'   THEN 1 ELSE 0 END) AS SAVE_CNT,
+        SUM(CASE WHEN EVENT_TYPE='CLONE'  THEN 1 ELSE 0 END) AS CLONE_CNT,
+        SUM(CASE WHEN EVENT_TYPE='DELETE' THEN 1 ELSE 0 END) AS DELETE_CNT
+      FROM LOG_USER_EVENT
+      WHERE RUN_AT >= TO_DATE(#{from}, 'YYYY-MM-DD')
+        AND RUN_AT <  TO_DATE(#{to},   'YYYY-MM-DD') + 1
+        AND FEATURE = 'DESIGN'
+    ]]>
+  </select>
+
+  <!-- 6) 스탬프/포인트 KPI -->
+  <select id="selectStampPointKpis" resultType="map">
+    <![CDATA[
+      WITH ST AS (
+        SELECT USER_ID, COUNT(*) AS STAMP_CNT
+        FROM LOG_USER_EVENT
+        WHERE RUN_AT >= TO_DATE(#{from}, 'YYYY-MM-DD')
+          AND RUN_AT <  TO_DATE(#{to},   'YYYY-MM-DD') + 1
+          AND FEATURE='STAMP' AND EVENT_TYPE='INSERT'
+          AND USER_ID IS NOT NULL AND USER_ID <> 'ANON'
+        GROUP BY USER_ID
+      ),
+      ST_AGG AS (
+        SELECT ROUND(AVG(STAMP_CNT), 2) AS STAMP_AVG
+        FROM ST
+      ),
+      PT AS (
+        SELECT COUNT(*) AS POINT_CNT
+        FROM LOG_USER_EVENT
+        WHERE RUN_AT >= TO_DATE(#{from}, 'YYYY-MM-DD')
+          AND RUN_AT <  TO_DATE(#{to},   'YYYY-MM-DD') + 1
+          AND FEATURE='POINT' AND EVENT_TYPE='INSERT'
+      )
+      SELECT
+        NVL(ST_AGG.STAMP_AVG, 0) AS STAMP_AVG,
+        PT.POINT_CNT             AS TOTAL_POINTS
+      FROM ST_AGG
+      CROSS JOIN PT
+    ]]>
+  </select>
+
+  <!-- 7-1 평균 세션 시간(분) -->
+  <select id="selectAvgSessionMinutes" resultType="double">
+    <![CDATA[
+      WITH EV AS (
+        SELECT USER_ID, RUN_AT
+        FROM LOG_USER_EVENT
+        WHERE RUN_AT >= TO_DATE(#{from}, 'YYYY-MM-DD')
+          AND RUN_AT <  TO_DATE(#{to},   'YYYY-MM-DD') + 1
+          AND USER_ID IS NOT NULL AND USER_ID <> 'ANON'
+      ),
+      S1 AS (
+        SELECT USER_ID, RUN_AT,
+               LAG(RUN_AT) OVER (PARTITION BY USER_ID ORDER BY RUN_AT) AS PREV_AT
+        FROM EV
+      ),
+      S2 AS (
+        SELECT USER_ID, RUN_AT,
+               CASE WHEN PREV_AT IS NULL OR RUN_AT - PREV_AT > NUMTODSINTERVAL(30,'MINUTE') THEN 1 ELSE 0 END AS IS_NEW
+        FROM S1
+      ),
+      S3 AS (
+        SELECT USER_ID, RUN_AT,
+               SUM(IS_NEW) OVER (PARTITION BY USER_ID ORDER BY RUN_AT ROWS UNBOUNDED PRECEDING) AS SESS_IDX
+        FROM S2
+      ),
+      SESS AS (
+        SELECT USER_ID, MIN(RUN_AT) AS START_AT, MAX(RUN_AT) AS END_AT
+        FROM S3
+        GROUP BY USER_ID, SESS_IDX
+      ),
+      DUR AS (
+        SELECT (END_AT - START_AT) * 24 * 60 AS MINUTES
+        FROM SESS
+      )
+      SELECT NVL(ROUND(AVG(MINUTES),1), 0)
+      FROM DUR
+    ]]>
+  </select>
+
+  <!-- 7-2 DAU 합계 -->
+  <select id="selectDAU" resultType="int">
+    <![CDATA[
+      SELECT NVL(SUM(DAU),0)
+      FROM STATS_USER_DAILY
+      WHERE STAT_DATE >= TO_DATE(#{from}, 'YYYY-MM-DD')
+        AND STAT_DATE <  TO_DATE(#{to},   'YYYY-MM-DD') + 1
+    ]]>
+  </select>
+
+  <!-- 7-3 WAU -->
+  <select id="selectWAU" resultType="int">
+    <![CDATA[
+      SELECT COUNT(DISTINCT USER_ID)
+      FROM LOG_USER_EVENT
+      WHERE RUN_AT >= TO_DATE(#{to}, 'YYYY-MM-DD') - 7
+        AND RUN_AT <  TO_DATE(#{to}, 'YYYY-MM-DD') + 1
+        AND USER_ID IS NOT NULL AND USER_ID <> 'ANON'
+    ]]>
+  </select>
+
+  <!-- 7-4 MAU -->
+  <select id="selectMAU" resultType="int">
+    <![CDATA[
+      SELECT COUNT(DISTINCT USER_ID)
+      FROM LOG_USER_EVENT
+      WHERE RUN_AT >= TO_DATE(#{to}, 'YYYY-MM-DD') - 30
+        AND RUN_AT <  TO_DATE(#{to}, 'YYYY-MM-DD') + 1
+        AND USER_ID IS NOT NULL AND USER_ID <> 'ANON'
+    ]]>
+  </select>
+
+  <!-- 7-5 탈퇴 사용자 수 -->
+  <select id="selectChurnUsers" resultType="int">
+    <![CDATA[
+      SELECT COUNT(*)
+      FROM USERS
+      WHERE WITHDRAWN_AT IS NOT NULL
+        AND WITHDRAWN_AT >= TO_DATE(#{from}, 'YYYY-MM-DD')
+        AND WITHDRAWN_AT <  TO_DATE(#{to},   'YYYY-MM-DD') + 1
+    ]]>
+  </select>
+
+  <!-- 7-6 리텐션 (D7/D30/D90) -->
+  <select id="selectRetention" resultType="map">
+    <![CDATA[
+      WITH COHORT AS (
+        SELECT USER_ID, TRUNC(CREATED_AT) AS C_DAY
+        FROM USERS
+        WHERE CREATED_AT >= TO_DATE(#{from}, 'YYYY-MM-DD')
+          AND CREATED_AT <  TO_DATE(#{to},   'YYYY-MM-DD') + 1
+      ),
+      ACT AS (
+        SELECT USER_ID, TRUNC(RUN_AT) AS A_DAY
+        FROM LOG_USER_EVENT
+        WHERE RUN_AT >= TO_DATE(#{from}, 'YYYY-MM-DD')
+          AND RUN_AT <  TO_DATE(#{to},   'YYYY-MM-DD') + 91
+      )
+      SELECT
+        (SELECT COUNT(*) FROM COHORT) AS COHORT_SIZE,
+        (SELECT COUNT(*) FROM COHORT C WHERE EXISTS (
+           SELECT 1 FROM ACT A WHERE A.USER_ID = C.USER_ID AND A.A_DAY = C.C_DAY + 7
+        ))  AS D7_RET,
+        (SELECT COUNT(*) FROM COHORT C WHERE EXISTS (
+           SELECT 1 FROM ACT A WHERE A.USER_ID = C.USER_ID AND A.A_DAY = C.C_DAY + 30
+        )) AS D30_RET,
+        (SELECT COUNT(*) FROM COHORT C WHERE EXISTS (
+           SELECT 1 FROM ACT A WHERE A.USER_ID = C.USER_ID AND A.A_DAY = C.C_DAY + 90
+        )) AS D90_RET
+      FROM DUAL
+    ]]>
+  </select>
+
+  <!-- 신규 가입자 수 -->
+  <select id="selectNewUsersCount" resultType="int">
+    <![CDATA[
+      SELECT COUNT(*)
+      FROM USERS
+      WHERE CREATED_AT >= TO_DATE(#{from}, 'YYYY-MM-DD')
+        AND CREATED_AT <  TO_DATE(#{to},   'YYYY-MM-DD') + 1
+    ]]>
+  </select>
+
+  <!-- 평균 세션 유지시간(초) -->
+<select id="selectAvgSessionSeconds" resultType="double">
+  <![CDATA[
+    WITH EV AS (
+      SELECT USER_ID, CAST(RUN_AT AS DATE) AS RUN_AT
+      FROM LOG_USER_EVENT
+      WHERE RUN_AT >= TO_DATE(#{from}, 'YYYY-MM-DD')
+        AND RUN_AT <  TO_DATE(#{to},   'YYYY-MM-DD') + 1
+        AND USER_ID IS NOT NULL AND USER_ID <> 'ANON'
+    ),
+    S1 AS (
+      SELECT USER_ID, RUN_AT,
+             LAG(RUN_AT) OVER (PARTITION BY USER_ID ORDER BY RUN_AT) AS PREV_AT
+      FROM EV
+    ),
+    S2 AS (
+      SELECT USER_ID, RUN_AT,
+             CASE
+               /* 30분 = 30 / (24*60) 일 = 30/1440 */
+               WHEN PREV_AT IS NULL OR (RUN_AT - PREV_AT) > (30/1440)
+               THEN 1 ELSE 0
+             END AS IS_NEW
+      FROM S1
+    ),
+    S3 AS (
+      SELECT USER_ID, RUN_AT,
+             SUM(IS_NEW) OVER (PARTITION BY USER_ID ORDER BY RUN_AT
+                               ROWS UNBOUNDED PRECEDING) AS SESS_IDX
+      FROM S2
+    ),
+    SESS AS (
+      SELECT USER_ID,
+             MIN(RUN_AT) AS START_AT,
+             MAX(RUN_AT) AS END_AT
+      FROM S3
+      GROUP BY USER_ID, SESS_IDX
+    ),
+    DUR AS (
+      SELECT (END_AT - START_AT) * 86400 AS SECS  -- 일수 → 초
+      FROM SESS
+    )
+    SELECT NVL(ROUND(AVG(SECS), 0), 0)
+    FROM DUR
+  ]]>
+</select>
+
+
+</mapper>

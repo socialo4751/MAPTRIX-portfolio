@@ -1,0 +1,502 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.ddit.user.signin.mapper.UsersMapper">
+
+    <resultMap id="usersMap"
+               type="kr.or.ddit.common.vo.user.UsersVO">
+        <id property="userId" column="USER_ID"/>
+        <result property="password" column="PASSWORD"/>
+        <result property="name" column="NAME"/>
+        <result property="gender" column="GENDER"/>
+        <result property="createdAt" column="CREATED_AT"/>
+        <result property="enabled" column="ENABLED" jdbcType="CHAR"/>
+        <result property="birthDate" column="BIRTH_DATE"/>
+        <result property="phoneNumber" column="PHONE_NUMBER"/>
+        <result property="email" column="EMAIL"/>
+        <result property="postcode" column="POSTCODE"/>
+        <result property="address1" column="ADDRESS1"/>
+        <result property="address2" column="ADDRESS2"/>
+        <result property="withdrawnAt" column="WITHDRAWN_AT"/>
+        <result property="deptId" column="DEPT_ID"/>
+        <collection property="usersAuthVOList"
+                    ofType="kr.or.ddit.common.vo.user.UsersAuthVO"
+                    select="selectUserAuths" column="USER_ID"/>
+        <collection property="userMyDistrictVOList"
+                    ofType="kr.or.ddit.common.vo.user.UserMyDistrictVO"
+                    select="selectUserMyDistricts" column="USER_ID"/>
+        <collection property="codeAdmDongVOList"
+                    resultMap="codeAdmDongMap"></collection>
+
+        <collection property="codeBizVOList"
+                    ofType="kr.or.ddit.common.vo.code.CodeBizVO"></collection>
+
+        <collection property="usersBizIdVO"
+                    resultMap="usersBizIdMap"></collection>
+
+
+        <collection property="userMyBizVOList"
+                    ofType="kr.or.ddit.common.vo.user.UserMyBizVO"
+                    select="selectUserMyBizs"
+                    column="USER_ID"/>
+    </resultMap>
+
+    <!-- 2. resultMap을 꺼냄 -->
+    <resultMap type="kr.or.ddit.common.vo.code.CodeAdmDongVO"
+               id="codeAdmDongMap">
+        <id property="dongCode" column="DONG_CODE"/>
+        <result property="admName" column="ADM_NAME"/>
+    </resultMap>
+
+    <!-- 08.13 주소 추가 -->
+    <resultMap type="kr.or.ddit.common.vo.user.UsersBizIdVO"
+               id="usersBizIdMap">
+        <id property="bizNumber" column="BIZ_NUMBER"/>
+        <result property="userId" column="BIZ_USER_ID"/>
+        <result property="companyName" column="COMPANY_NAME"/>
+        <result property="startDate" column="START_DATE"/>
+        <result property="bizPostcode" column="BIZ_POSTCODE"/>
+        <result property="bizAddress1" column="BIZ_ADDRESS1"/>
+        <result property="bizAddress2" column="BIZ_ADDRESS2"/>
+    </resultMap>
+
+    <resultMap id="userMyBizVOMap" type="kr.or.ddit.common.vo.user.UserMyBizVO">
+        <id property="userId" column="USER_ID"/>
+        <result property="bizCodeId" column="BIZ_CODE_ID"/>
+        <result property="createdAt" column="CREATED_AT"/>
+        <result property="bizName" column="BIZ_NAME"/>
+    </resultMap>
+
+    <!-- 1. resultMap 을 꺼냄 -->
+    <resultMap id="usersHistoryMap"
+               type="kr.or.ddit.admin.users.vo.UsersHistoryVO">
+        <id property="historyId" column="HISTORY_ID"/>
+        <result property="userId" column="USER_ID"/>
+        <result property="preEnabled" column="PRE_ENABLED"/>
+        <result property="newEnabled" column="NEW_ENABLED"/>
+        <result property="reason" column="REASON"/>
+        <result property="changedBy" column="CHANGED_BY"/>
+        <result property="changedAt" column="CHANGED_AT"/>
+        <result property="expiresAt" column="EXPIRES_AT"/>
+    </resultMap>
+
+    <select id="selectUserAuths" parameterType="String"
+            resultType="kr.or.ddit.common.vo.user.UsersAuthVO">
+        SELECT USER_ID,
+               AUTH
+        FROM USERS_AUTH
+        WHERE USER_ID = #{userId}
+    </select>
+
+    <select id="selectUserMyDistricts" parameterType="String"
+            resultType="kr.or.ddit.common.vo.user.UserMyDistrictVO">
+        SELECT USER_ID,
+               ADM_CODE,
+               CREATED_AT
+        FROM USER_MY_DISTRICT
+        WHERE USER_ID = #{userId}
+    </select>
+
+    <select id="selectUserMyBizs" parameterType="String" resultMap="userMyBizVOMap">
+        SELECT A.USER_ID,
+               A.BIZ_CODE_ID,
+               A.CREATED_AT,
+               B.BIZ_NAME
+        FROM USER_MY_BIZ A
+                 INNER JOIN
+             CODE_BIZ B ON A.BIZ_CODE_ID = B.BIZ_CODE_ID
+        WHERE A.USER_ID = #{userId}
+        ORDER BY A.CREATED_AT DESC
+    </select>
+
+    <select id="selectUsersList" parameterType="map"
+            resultMap="usersMap">
+        SELECT * FROM (
+        SELECT A.*, ROWNUM RNUM FROM (
+        SELECT
+        USER_ID,
+        NAME,
+        EMAIL,
+        PHONE_NUMBER,
+        ENABLED,
+        CREATED_AT,
+        WITHDRAWN_AT
+        FROM
+        USERS
+        WHERE 1=1
+        <if test="searchKeyword != null and searchKeyword != ''">
+            AND (
+            USER_ID LIKE '%' || #{searchKeyword} || '%'
+            OR NAME LIKE '%' || #{searchKeyword} || '%'
+            OR EMAIL LIKE '%' || #{searchKeyword} || '%'
+            OR PHONE_NUMBER LIKE '%' || #{searchKeyword} || '%'
+            )
+        </if>
+        <if test="searchType != null and searchType != ''">
+            <choose>
+                <when test="searchType == 'USER_Y'">
+                    AND ENABLED = 'Y' AND WITHDRAWN_AT IS NULL
+                </when>
+                <when test="searchType == 'USER_N'">
+                    AND ENABLED = 'N' AND WITHDRAWN_AT IS NULL
+                </when>
+                <when test="searchType == 'USER_W'">
+                    AND WITHDRAWN_AT IS NOT NULL
+                </when>
+                <when test="searchType == 'USER_NEW_MONTH'">
+                    AND WITHDRAWN_AT IS NULL
+                    AND CREATED_AT &gt;= TRUNC(SYSDATE, 'MM')
+                    AND CREATED_AT &lt; ADD_MONTHS(TRUNC(SYSDATE, 'MM'), 1)
+                </when>
+            </choose>
+        </if>
+        ORDER BY CREATED_AT DESC
+        ) A
+        WHERE ROWNUM &lt;= #{endRow}
+        )
+        WHERE RNUM &gt;= #{startRow}
+    </select>
+
+    <select id="selectUserHistory" parameterType="String"
+            resultMap="usersHistoryMap">
+        SELECT HISTORY_ID,
+               USER_ID,
+               PRE_ENABLED,
+               NEW_ENABLED,
+               REASON,
+               CHANGED_BY,
+               CHANGED_AT,
+               EXPIRES_AT
+        FROM USERS_HISTORY
+        WHERE USER_ID = #{userId}
+          AND NEW_ENABLED = 'N'
+        ORDER BY CHANGED_AT DESC
+    </select>
+
+    <select id="selectByUserId" parameterType="String" resultMap="usersMap">
+        SELECT U.USER_ID,
+               U.PASSWORD,
+               U.NAME,
+               U.CREATED_AT,
+               U.ENABLED,
+               U.BIRTH_DATE,
+               U.PHONE_NUMBER,
+               U.EMAIL,
+               U.POSTCODE,
+               U.ADDRESS1,
+               U.ADDRESS2,
+               U.WITHDRAWN_AT,
+               U.GENDER,
+               UBI.BIZ_NUMBER,
+               UBI.USER_ID AS BIZ_USER_ID,
+               UBI.COMPANY_NAME,
+               UBI.START_DATE,
+               UBI.BIZ_POSTCODE,
+               UBI.BIZ_ADDRESS1,
+               UBI.BIZ_ADDRESS2,
+               CB.BIZ_CODE_ID,
+               CB.BIZ_NAME,
+               CB.BIZ_LEVEL,
+               CB.PARENT_CODE_ID,
+               CAD.ADM_CODE,
+               CAD.ADM_NAME,
+               OE.DEPT_ID
+        FROM USERS U
+                 LEFT OUTER JOIN
+             USER_MY_BIZ UMB ON U.USER_ID = UMB.USER_ID
+                 LEFT OUTER JOIN
+             CODE_BIZ CB ON UMB.BIZ_CODE_ID = CB.BIZ_CODE_ID
+                 LEFT OUTER JOIN
+             USER_MY_DISTRICT UMD ON U.USER_ID = UMD.USER_ID
+                 LEFT OUTER JOIN
+             CODE_ADM_DONG CAD ON UMD.ADM_CODE = CAD.ADM_CODE
+                 LEFT OUTER JOIN
+             USERS_BIZ_ID UBI ON U.USER_ID = UBI.USER_ID
+                 LEFT OUTER JOIN
+             ORG_EMP OE ON U.USER_ID = OE.EMP_ID
+        WHERE U.USER_ID = #{userId}
+    </select>
+
+    <select id="countByUserId" parameterType="string"
+            resultType="int">
+        SELECT COUNT(*)
+        FROM USERS
+        WHERE USER_ID = #{userId}
+    </select>
+
+    <insert id="insertUser"
+            parameterType="kr.or.ddit.common.vo.user.UsersVO">
+        INSERT INTO USERS (USER_ID, PASSWORD, NAME, GENDER, PHONE_NUMBER, EMAIL, CREATED_AT, ENABLED, BIRTH_DATE,
+                           POSTCODE, ADDRESS1, ADDRESS2)
+        VALUES (#{userId}, #{password}, #{name}, #{gender, jdbcType=CHAR}, #{phoneNumber}, #{email}, SYSDATE, 'Y',
+                #{birthDate, jdbcType=DATE}, #{postcode}, #{address1}, #{address2})
+    </insert>
+
+    <update id="updateUser"
+            parameterType="kr.or.ddit.common.vo.user.UsersVO">
+        UPDATE USERS
+        SET NAME         = #{name},
+            PHONE_NUMBER = #{phoneNumber},
+            EMAIL        = #{email},
+            BIRTH_DATE   = #{birthDate, jdbcType=DATE},
+            POSTCODE     = #{postcode},
+            ADDRESS1     = #{address1},
+            ADDRESS2     = #{address2}
+        WHERE USER_ID = #{userId}
+    </update>
+
+    <update id="updateUserEnabledStatus" parameterType="map">
+        UPDATE USERS
+        SET ENABLED = #{newEnabledStatus}
+        WHERE USER_ID = #{userId}
+    </update>
+
+    <insert id="insertUserHistory"
+            parameterType="kr.or.ddit.admin.users.vo.UsersHistoryVO">
+        <selectKey keyProperty="historyId" resultType="int"
+                   order="BEFORE">
+            SELECT USERS_HISTORY_SEQ.NEXTVAL FROM DUAL
+        </selectKey>
+        INSERT INTO USERS_HISTORY (
+        HISTORY_ID, USER_ID, PRE_ENABLED, NEW_ENABLED, REASON, CHANGED_BY, CHANGED_AT
+        <if test="expiresAt != null">, EXPIRES_AT</if>
+        ) VALUES (
+        #{historyId},
+        #{userId}, #{preEnabled}, #{newEnabled}, #{reason},
+        #{changedBy}, SYSDATE
+        <if test="expiresAt != null">, #{expiresAt, jdbcType=DATE}</if>
+        )
+    </insert>
+
+    <delete id="deleteUserRefreshTokens" parameterType="String">
+        DELETE
+        FROM USERS_REF_TOKEN
+        WHERE USER_ID = #{userId}
+    </delete>
+
+    <update id="withdrawUser" parameterType="String">
+        UPDATE USERS
+        SET ENABLED      = 'N',
+            WITHDRAWN_AT = SYSDATE
+        WHERE USER_ID = #{userId}
+
+    </update>
+
+    <!-- 권한 입력 -->
+    <insert id="insertAuth">
+        INSERT INTO USERS_AUTH (USER_ID, AUTH)
+        VALUES (#{userId}, #{role})
+    </insert>
+
+    <!-- 관심구역 등록 -->
+    <insert id="insertMyDistrict"
+            parameterType="kr.or.ddit.common.vo.user.UserMyDistrictVO">
+        INSERT INTO USER_MY_DISTRICT (
+        USER_ID,
+        ADM_CODE
+
+        <!-- CREATED_AT,DISPLAY_ORDER sms DEFAULT 값을 입력하므로 생략 -->
+        ) VALUES (
+        #{userId},
+        #{admCode} -- dongCode -> admCode로 수정
+        )
+    </insert>
+
+    <!-- 관심업종 등록 -->
+    <insert id="insertMyBiz"
+            parameterType="kr.or.ddit.common.vo.user.UserMyBizVO">
+        INSERT INTO USER_MY_BIZ (USER_ID,
+                                 BIZ_CODE_ID,
+                                 CREATED_AT)
+        VALUES (#{userId},
+                #{bizCodeId},
+                SYSDATE)
+    </insert>
+
+    <!-- 관심구역 삭제 -->
+    <delete id="deleteMyDistricts" parameterType="String">
+        DELETE
+        FROM USER_MY_DISTRICT
+        WHERE USER_ID = #{userId}
+    </delete>
+
+    <!-- 관심업종 삭제 -->
+    <delete id="deleteMyBizs" parameterType="String">
+        DELETE
+        FROM USER_MY_BIZ
+        WHERE USER_ID = #{userId}
+    </delete>
+
+    <!-- 사업자등록번호 등록 -->
+    <!-- 08.13 주소 추가 -->
+    <insert id="insertBusinessNumber"
+            parameterType="kr.or.ddit.common.vo.user.UsersBizIdVO">
+        INSERT INTO USERS_BIZ_ID (BIZ_NUMBER,
+                                  USER_ID,
+                                  COMPANY_NAME,
+                                  START_DATE,
+                                  BIZ_POSTCODE,
+                                  BIZ_ADDRESS1,
+                                  BIZ_ADDRESS2)
+        VALUES (TO_NUMBER(#{bizNumber}),
+                #{userId},
+                #{companyName},
+                #{startDate},
+                #{bizPostcode},
+                #{bizAddress1},
+                #{bizAddress2})
+    </insert>
+
+    <!-- 사업자등록번호 변경 -->
+    <!-- 08.13 주소 추가 -->
+    <update id="updateBizInfo"
+            parameterType="kr.or.ddit.common.vo.user.UsersBizIdVO">
+        UPDATE USERS_BIZ_ID
+        SET BIZ_NUMBER   = #{bizNumber},
+            COMPANY_NAME = #{companyName},
+            START_DATE   = #{startDate},
+            BIZ_POSTCODE = #{bizPostcode},
+            BIZ_ADDRESS1 = #{bizAddress1},
+            BIZ_ADDRESS2 = #{bizAddress2}
+        WHERE USER_ID = #{userId}
+    </update>
+
+    <!-- 구 셀렉트바 표시용 -->
+    <select id="selectAllDistricts"
+            resultType="kr.or.ddit.common.vo.code.CodeDistrictVO">
+        SELECT DISTRICT_ID,
+               DISTRICT_NAME
+        FROM CODE_DISTRICT
+        ORDER BY DISTRICT_NAME ASC
+    </select>
+
+    <!-- 동 셀렉트바 표시용 -->
+    <select id="selectDongsByDistrict" parameterType="int"
+            resultType="kr.or.ddit.common.vo.code.CodeAdmDongVO">
+        SELECT ADM_CODE,
+               ADM_NAME
+        FROM CODE_ADM_DONG
+        WHERE DISTRICT_ID = #{districtId}
+        ORDER BY ADM_NAME ASC
+    </select>
+
+    <!-- 대분류 업종 조회 -->
+    <select id="selectMainBizCategories"
+            resultType="kr.or.ddit.common.vo.code.CodeBizVO">
+        SELECT BIZ_CODE_ID, BIZ_NAME
+        FROM CODE_BIZ
+        WHERE PARENT_CODE_ID IS NULL
+        ORDER BY BIZ_NAME
+    </select>
+
+    <!-- 중분류 업종 조회 -->
+    <select id="selectSubBizCategories" parameterType="String"
+            resultType="kr.or.ddit.common.vo.code.CodeBizVO">
+        SELECT BIZ_CODE_ID, BIZ_NAME
+        FROM CODE_BIZ
+        WHERE PARENT_CODE_ID = #{parentCodeId}
+        ORDER BY BIZ_NAME
+    </select>
+
+    <!-- 현재 활성화 여부 조회 -->
+    <select id="findLatestActiveSuspensionByUserId"
+            resultType="kr.or.ddit.admin.users.vo.UsersHistoryVO">
+        SELECT HISTORY_ID,
+               USER_ID,
+               PRE_ENABLED,
+               NEW_ENABLED,
+               REASON,
+               CHANGED_BY,
+               CHANGED_AT,
+               EXPIRES_AT
+        FROM (SELECT HISTORY_ID,
+                     USER_ID,
+                     PRE_ENABLED,
+                     NEW_ENABLED,
+                     REASON,
+                     CHANGED_BY,
+                     CHANGED_AT,
+                     EXPIRES_AT
+              FROM USERS_HISTORY
+              WHERE USER_ID = #{userId}
+                AND NEW_ENABLED = 'N'
+                AND EXPIRES_AT IS NULL
+              ORDER BY CHANGED_AT DESC)
+        WHERE ROWNUM = 1
+    </select>
+
+    <!-- 회원 상태 업데이트 -->
+    <update id="updateUserHistoryExpiresAt"
+            parameterType="kr.or.ddit.admin.users.vo.UsersHistoryVO">
+        UPDATE USERS_HISTORY
+        SET EXPIRES_AT = SYSDATE,
+            CHANGED_BY = #{changedBy}
+        WHERE HISTORY_ID = #{historyId}
+    </update>
+
+    <select id="getUsersCount" resultType="int">
+        SELECT COUNT(*)
+        FROM USERS
+        WHERE 1 = 1
+        <if test="searchKeyword != null and searchKeyword != ''">
+            AND (
+            USER_ID LIKE '%' || #{searchKeyword} || '%'
+            OR NAME LIKE '%' || #{searchKeyword} || '%'
+            OR EMAIL LIKE '%' || #{searchKeyword} || '%'
+            OR PHONE_NUMBER LIKE '%' || #{searchKeyword} || '%'
+            )
+        </if>
+
+        <choose>
+            <when test="searchType != null and searchType != ''">
+                <choose>
+                    <when test="searchType == 'USER_Y'">
+                        AND ENABLED = 'Y' AND WITHDRAWN_AT IS NULL
+                    </when>
+                    <when test="searchType == 'USER_N'">
+                        AND ENABLED = 'N' AND WITHDRAWN_AT IS NULL
+                    </when>
+                    <when test="searchType == 'USER_W'">
+                        AND WITHDRAWN_AT IS NOT NULL
+                    </when>
+                    <when test="searchType == 'USER_NEW_MONTH'">
+                        AND WITHDRAWN_AT IS NULL
+                        AND CREATED_AT &gt;= TRUNC(SYSDATE, 'MM')
+                        AND CREATED_AT &lt; ADD_MONTHS(TRUNC(SYSDATE, 'MM'), 1)
+                    </when>
+                </choose>
+            </when>
+            <otherwise>
+                <if test="enabledStatus != null and enabledStatus != ''">
+                    AND ENABLED = #{enabledStatus}
+                </if>
+            </otherwise>
+        </choose>
+
+    </select>
+    <select id="selectUserStatusSummary" parameterType="map" resultType="map">
+        SELECT
+        /* 전체: 검색어가 걸린 모든 사용자 수 (탈퇴 포함) */
+        COUNT(*) AS TOTAL_COUNT,
+        /* 활성: enabled='Y' AND 탈퇴 아님 */
+        SUM(CASE WHEN ENABLED = 'Y' AND WITHDRAWN_AT IS NULL THEN 1 ELSE 0 END) AS ACTIVE_COUNT,
+        /* 정지: enabled='N' AND 탈퇴 아님 */
+        SUM(CASE WHEN ENABLED = 'N' AND WITHDRAWN_AT IS NULL THEN 1 ELSE 0 END) AS SUSPENDED_COUNT,
+        SUM(CASE WHEN WITHDRAWN_AT IS NOT NULL THEN 1 ELSE 0 END) AS WITHDRAWN_COUNT,
+        /* 신규(당월): 탈퇴 아님 + 이번 달 생성 */
+        SUM(CASE WHEN WITHDRAWN_AT IS NULL
+        AND CREATED_AT &gt;= TRUNC(SYSDATE, 'MM')
+        AND CREATED_AT &lt; ADD_MONTHS(TRUNC(SYSDATE, 'MM'), 1)
+        THEN 1 ELSE 0 END) AS NEW_MONTH_COUNT
+        FROM USERS
+        WHERE 1=1
+        <if test="searchKeyword != null and searchKeyword != ''">
+            AND (
+            USER_ID LIKE '%' || #{searchKeyword} || '%'
+            OR NAME LIKE '%' || #{searchKeyword} || '%'
+            OR EMAIL LIKE '%' || #{searchKeyword} || '%'
+            OR PHONE_NUMBER LIKE '%' || #{searchKeyword} || '%'
+            )
+        </if>
+    </select>
+
+</mapper>

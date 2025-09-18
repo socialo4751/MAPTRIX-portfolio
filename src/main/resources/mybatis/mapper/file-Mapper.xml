@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+    namespace는 FileMapper 인터페이스의 전체 경로와 일치해야 합니다.
+-->
+<mapper namespace="kr.or.ddit.common.file.mapper.FileMapper">
+
+    <!--
+        [파일 그룹 INSERT]
+        - useGeneratedKeys와 keyProperty 속성을 사용하여,
+          시퀀스로부터 생성된 새로운 FILE_GROUP_NO 값을
+          파라미터로 받은 FileGroupVO 객체의 fileGroupNo 필드에 자동으로 세팅해줍니다.
+    -->
+    <insert id="insertFileGroup" parameterType="kr.or.ddit.common.file.vo.FileGroupVO" useGeneratedKeys="true">
+        <selectKey keyProperty="fileGroupNo" resultType="long" order="BEFORE">
+            SELECT SEQ_FILE_GROUP_NO.NEXTVAL FROM DUAL
+        </selectKey>
+        INSERT INTO FILE_GROUP (FILE_GROUP_NO, FILE_REGDATE)
+        VALUES (#{fileGroupNo}, SYSDATE)
+    </insert>
+
+    <!--
+        [파일 상세 정보 INSERT]
+        - FileDetailVO에 담겨온 모든 파일 정보를 DB에 저장합니다.
+        - 파일 순번(FILE_SN)은 시퀀스를 사용합니다.
+        
+        
+        파일 롤은 thumbnail , image1 , image2 이런식으로 저장해주세요!!!!!!!!!!!!!!!
+        
+    -->
+    <insert id="insertFileDetail" parameterType="kr.or.ddit.common.file.vo.FileDetailVO">
+        <selectKey keyProperty="fileSn" resultType="int" order="BEFORE">
+            SELECT SEQ_FILE_SN.NEXTVAL FROM DUAL
+        </selectKey>
+        
+        INSERT INTO FILE_DETAIL (
+            FILE_SN,
+            FILE_GROUP_NO,
+            FILE_ORIGINAL_NAME,
+            FILE_SAVE_NAME,
+            FILE_SAVE_LOCATE,
+            FILE_SIZE,
+            FILE_EXT,
+            FILE_MIME,
+            FILE_FANCYSIZE,
+            FILE_SAVE_DATE,
+            FILE_DOWNCOUNT,
+            FILE_ROLE
+        )
+        VALUES (
+            #{fileSn},  #{fileGroupNo},
+            #{fileOriginalName},
+            #{fileSaveName},
+            #{fileSaveLocate},
+            #{fileSize},
+            #{fileExt},
+            #{fileMime},
+            #{fileFancysize},
+            SYSDATE,
+            0,
+            #{fileRole}
+        )
+    </insert>
+    <!-- fileGroupNo로 파일 목록 조회 -->
+    <select id="selectFileList" parameterType="long" resultType="kr.or.ddit.common.file.vo.FileDetailVO">
+        SELECT FILE_SN,
+               FILE_GROUP_NO,
+               FILE_ORIGINAL_NAME,
+               FILE_SAVE_NAME,
+               FILE_SAVE_LOCATE,
+               FILE_SIZE,
+               FILE_EXT,
+               FILE_MIME,
+               FILE_FANCYSIZE,
+               FILE_SAVE_DATE,
+               FILE_DOWNCOUNT,
+               FILE_ROLE
+        FROM FILE_DETAIL
+        WHERE FILE_GROUP_NO = #{fileGroupNo}
+        ORDER BY FILE_SN
+    </select>
+
+    <!-- 2) 단일 파일 정보 (다운로드용) -->
+    <select id="selectFileDetail" resultType="kr.or.ddit.common.file.vo.FileDetailVO">
+        SELECT FILE_GROUP_NO      AS fileGroupNo,
+               FILE_SN            AS fileSn,
+               FILE_ORIGINAL_NAME AS fileOriginalName,
+               FILE_SAVE_NAME     AS fileSaveName,
+               FILE_SAVE_LOCATE   AS fileSaveLocate,
+               FILE_SIZE          AS fileSize,
+               FILE_EXT           AS fileExt,
+               FILE_MIME          AS fileMime,
+               FILE_ROLE          AS fileRole,
+               FILE_SAVE_DATE AS fileSaveDate
+        FROM FILE_DETAIL
+        WHERE FILE_GROUP_NO = #{fileGroupNo}
+          AND FILE_SN = #{fileSn}
+    </select>
+    
+
+
+</mapper>

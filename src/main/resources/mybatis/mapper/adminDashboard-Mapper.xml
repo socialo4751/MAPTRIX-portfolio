@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="kr.or.ddit.admin.main.mapper.AdminDashboardMapper">
+
+    <!-- ✅ 최근 N일 가입 추이 (빈 날짜 포함 일자 시리즈) -->
+    <select id="selectDailySignupTrend" resultType="map">
+        WITH range AS (
+            SELECT TO_DATE(#{startDate}, 'YYYY-MM-DD') AS s,
+                   TO_DATE(#{endDate},   'YYYY-MM-DD') AS e
+            FROM dual
+        ), days AS (
+            SELECT s + LEVEL - 1 AS DT
+            FROM range
+        CONNECT BY LEVEL &lt;= (e - s) + 1
+            )
+        SELECT TO_CHAR(d.DT, 'YYYY-MM-DD') AS DT,
+               (SELECT COUNT(*)
+                FROM USERS u
+                WHERE TRUNC(u.CREATED_AT) = d.DT) AS CNT
+        FROM days d
+        ORDER BY d.DT
+    </select>
+
+    <!-- ✅ 24h 로그 레벨 분포 (LOGGING_EVENT) -->
+    <select id="selectLogLevelCountsBetweenMs" resultType="map">
+        SELECT LEVEL_STRING AS LV, COUNT(*) AS CNT
+        FROM LOGGING_EVENT
+        WHERE TIMESTMP BETWEEN #{fromMs} AND #{toMs}
+        GROUP BY LEVEL_STRING
+    </select>
+
+    <!-- ✅ 24h ERROR 개수 -->
+    <select id="selectErrorCountBetweenMs" resultType="int">
+        SELECT COUNT(*)
+        FROM LOGGING_EVENT
+        WHERE LEVEL_STRING = 'ERROR'
+          AND TIMESTMP BETWEEN #{fromMs} AND #{toMs}
+    </select>
+    <select id="selectSignupCountBetween" resultType="int">
+        SELECT COUNT(*)
+        FROM USERS
+        WHERE TRUNC(CREATED_AT) BETWEEN
+                  TO_DATE(#{startDate}, 'YYYY-MM-DD')
+                  AND TO_DATE(#{endDate},   'YYYY-MM-DD')
+    </select>
+
+</mapper>

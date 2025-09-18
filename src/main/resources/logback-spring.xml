@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- logback-spring.xml -->
+<configuration>
+  <!-- Spring Boot 기본 변수/패턴 -->
+  <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+
+  <!-- Spring 환경변수 바인딩 -->
+  <springProperty scope="context" name="dbDriver" source="spring.datasource.driver-class-name"/>
+  <springProperty scope="context" name="dbUrl"    source="spring.datasource.url"/>
+  <springProperty scope="context" name="dbUser"   source="spring.datasource.username"/>
+  <springProperty scope="context" name="dbPass"   source="spring.datasource.password"/>
+
+  <!-- 콘솔 -->
+  <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder>
+      <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] %logger - %msg%n</pattern>
+    </encoder>
+  </appender>
+
+  <!-- 프레임워크 쪽 노이즈 억제 (DB와 무관하므로 프로필 밖에 둬도 됨) -->
+  <logger name="org.springframework" level="WARN"/>
+  <logger name="org.hibernate" level="WARN"/>
+  <logger name="org.apache.coyote" level="WARN"/>
+
+  <!-- 루트는 콘솔만 -->
+  <root level="INFO">
+    <appender-ref ref="CONSOLE"/>
+  </root>
+
+  <!-- ===== DB 로깅은 db-log 프로필에서만 활성화 ===== -->
+  <springProfile name="db-log">
+
+    <!-- DBAppender (오라클) -->
+    <appender name="DB" class="ch.qos.logback.classic.db.DBAppender">
+      <connectionSource class="ch.qos.logback.core.db.DataSourceConnectionSource">
+        <dataSource class="org.springframework.jdbc.datasource.DriverManagerDataSource">
+          <driverClassName>${dbDriver}</driverClassName>
+          <url>${dbUrl}</url>
+          <username>${dbUser}</username>
+          <password>${dbPass}</password>
+        </dataSource>
+        
+              <!-- 오라클 방언 명시(GeneratedKeys 감지 실패 대비) -->
+      <sqlDialect class="ch.qos.logback.core.db.dialect.OracleDialect"/>
+      </connectionSource>
+
+      <!-- 너무 낮은 레벨은 DB로 안 보냄  -->
+      <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+        <level>INFO</level>
+      </filter>
+    </appender>
+
+    <!-- 요청 지연 방지: 비동기로 DB 쓰기 -->
+    <appender name="DB_ASYNC" class="ch.qos.logback.classic.AsyncAppender">
+  <!-- 스키마가 CALLER_* NOT NULL이면 true 유지, 성능이슈시 컬럼 NULL 허용으로 바꾼 뒤 false 권장 -->
+      <includeCallerData>true</includeCallerData>
+      <queueSize>8192</queueSize>
+      <discardingThreshold>20</discardingThreshold>
+      <neverBlock>true</neverBlock>
+      <appender-ref ref="DB"/>
+    </appender>
+
+    <!-- 기본 정책: 우리 코드만(DB 저장) -->
+    <logger name="kr.or.ddit" level="INFO" additivity="false">
+      <appender-ref ref="CONSOLE"/>
+      <appender-ref ref="DB_ASYNC"/>
+    </logger>
+
+    <!-- 예외(제외) 패키지: 콘솔만, DB 미저장 -->
+    <!-- 필요에 따라 아래 목록을 추가/수정하세요 -->
+    <logger name="kr.or.ddit.MaptrixApplication" level="INFO" additivity="false">
+      <appender-ref ref="CONSOLE"/>
+    </logger>
+    <logger name="kr.or.ddit.batch" level="INFO" additivity="false">
+      <appender-ref ref="CONSOLE"/>
+    </logger>
+    <logger name="kr.or.ddit.common.file" level="INFO" additivity="false">
+      <appender-ref ref="CONSOLE"/>
+    </logger>
+
+  </springProfile>
+</configuration>

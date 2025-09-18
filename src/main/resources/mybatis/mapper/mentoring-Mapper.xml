@@ -1,0 +1,213 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="kr.or.ddit.startup.mt.mapper.MentoringMapper">
+	
+	<!-- 키워드 검색 기능 -->
+	<sql id="search">
+	    <!-- 분류(카테고리) 필터 -->
+	    <if test="searchType != null and searchType != ''">
+	        AND S.CAT_CODE_ID = #{searchType}
+	    </if>
+	
+	    <!-- [추가] 접수 여부 필터 -->
+	    <if test="statusType != null and statusType != ''">
+	        <if test="statusType == 'mt_ing'">
+	            AND S.DEADLINE >= TRUNC(SYSDATE)
+	        </if>
+	        <if test="statusType == 'mt_closed'">
+	            AND S.DEADLINE &lt; TRUNC(SYSDATE)
+	        </if>
+	    </if>
+	
+	    <!-- 키워드 검색 필터 -->
+		<if test="searchWord != null and searchWord != ''">
+		  AND (
+		    S.TITLE   LIKE '%' || #{searchWord} || '%'
+		    OR S.CONTENT LIKE '%' || #{searchWord} || '%'
+		  )
+		</if>
+	</sql>
+		
+	<select id="selectTotalCount" parameterType="java.util.Map" resultType="int">
+		SELECT COUNT(S.POST_ID)
+		FROM SU_MENT_POST S
+		WHERE S.IS_DELETED = 'N'
+		<include refid="search" /> 
+		<!-- searchType(title)   : AND P.TITLE   LIKE #{searchWord} 
+			 searchType(content) : AND P.CONTENT LIKE #{searchWord} -->		
+	</select>
+	
+	<!-- 멘토링 리스트 목록 조회 및 페이징 -->
+	<select id="selectMentoringPostList" parameterType="java.util.Map" resultType="kr.or.ddit.startup.mt.vo.SuMentPostVO">
+		<!-- 3) ROWNUM이 사직 행(startrow) 이상인 데이터만 최종적으로 선택 -->
+        SELECT
+            B.*
+        FROM (
+            SELECT
+            <!-- 2) 정렬된 결과 A에 ROWNUM을 이용해 1부터 순번을 매기고, 페이지의 끝나는 행(endrow)까지만 가져옴 -->
+                A.*, ROWNUM AS RNUM
+            FROM (
+				<!-- 1) 실제 데이터를 조회하고 정렬 -->
+				SELECT
+				    S.POST_ID
+				    ,S.USER_ID
+				    ,S.TITLE
+				    ,C.CODE_NAME AS catCodeId
+				    ,S.CONTENT
+				    ,S.VIEW_COUNT
+				    ,S.CREATED_AT
+				    ,S.UPDATED_AT
+				    ,S.IS_DELETED
+				    ,S.FILE_GROUP_NO
+				    ,S.LINK_URL
+				    ,S.DEADLINE
+				    ,F.FILE_SAVE_LOCATE AS thumbnailPath <!-- 썸네일 경로 추가 / VO의 thumbnailPath 필드와 매핑 -->
+				
+				FROM SU_MENT_POST S
+				    JOIN CODE_DETAIL C ON C.CODE_ID = S.CAT_CODE_ID
+				    <!-- LEFT JOIN 으로 썸네일 없는 게시물도 조회(FILE_GROUP_NO 은 NULL이 아니므로 변경해도됌) -->
+				    LEFT JOIN FILE_DETAIL F ON S.FILE_GROUP_NO = F.FILE_GROUP_NO AND F.FILE_ROLE ='thumbnail'   
+				    LEFT JOIN USERS U ON U.USER_ID = S.USER_ID
+				WHERE S.IS_DELETED = 'N'
+				<include refid="search"/> ORDER BY
+											    CASE
+											        WHEN S.DEADLINE &lt; SYSDATE THEN 1
+											        ELSE 0
+											    END,
+											    S.POST_ID DESC
+				) A
+            WHERE ROWNUM &lt;= #{endRow} <!-- ROWNUM은 이 위치에서 끝 번호 조건 처리 -->
+            ) B
+        WHERE 
+            B.RNUM &gt;= #{startRow} <!-- ROWNUM에 별칭을 부여해 시작 번호 조건 처리-->
+	</select>
+	
+	<!-- 멘토링 리스트 상세보기 -->
+	<select id="retrieveMentoringPost" parameterType="long" resultType="kr.or.ddit.startup.mt.vo.SuMentPostVO">
+		SELECT 
+		    S.POST_ID
+		    ,S.USER_ID
+		    ,S.TITLE
+		    ,C.CODE_NAME AS catCodeId
+		    ,S.CONTENT
+		    ,S.VIEW_COUNT
+		    ,S.CREATED_AT
+		    ,S.UPDATED_AT
+		    ,S.IS_DELETED
+		    ,S.FILE_GROUP_NO
+		    ,S.LINK_URL
+		    ,S.DEADLINE
+		    ,F.FILE_SAVE_LOCATE AS thumbnailPath
+		    
+		FROM SU_MENT_POST S
+		JOIN CODE_DETAIL C ON C.CODE_ID = S.CAT_CODE_ID
+		LEFT JOIN FILE_DETAIL F ON S.FILE_GROUP_NO = F.FILE_GROUP_NO AND F.FILE_ROLE ='thumbnail'
+		LEFT JOIN USERS U ON U.USER_ID = S.USER_ID
+		WHERE S.POST_ID = #{POST_ID}
+					
+	</select>
+	
+    <!-- 멘토링 게시글 등록 -->
+	<insert id="createMentoringPost" parameterType="kr.or.ddit.startup.mt.vo.SuMentPostVO">
+	
+	    <!-- INSERT 직후에 생성된 POST_ID를 SuMentPostVO의 postId 필드에 담아줌 -->
+	    <selectKey keyProperty="postId" resultType="int" order="BEFORE">
+	        SELECT SEQ_SU_MENT_POST_ID.NEXTVAL FROM DUAL
+	    </selectKey>
+	
+		INSERT INTO SU_MENT_POST(
+			POST_ID
+			,USER_ID
+			,CAT_CODE_ID
+			,TITLE
+			,CONTENT
+			,CREATED_AT
+			,FILE_GROUP_NO
+			,LINK_URL
+			,DEADLINE
+		) VALUES(
+			#{postId} <!-- selectKey에서 채워준 postId 사용 -->
+			,#{userId}
+			,#{catCodeId}
+			,#{title}
+			,#{content}
+			,SYSDATE
+			,#{fileGroupNo}
+			,#{linkUrl}
+			,#{deadline}
+			<!-- 
+			,#{viewCount}
+			,#{createdAt}
+			,#{isDeleted}		
+			 -->					
+			)
+		
+	</insert>
+	
+	<!-- detail에서 "이전" 게시물의 ID 와 제목을 조회해 이동 -->
+	<select id="selectPrevPost" parameterType="long" resultType="kr.or.ddit.startup.mt.vo.SuMentPostVO">
+	    SELECT
+	        PREV_POST_ID AS prevPostId,
+	        PREV_POST_TITLE AS prevPostTitle
+	    FROM (
+	        SELECT
+	            POST_ID,
+	            LAG(POST_ID, 1, 0) OVER (ORDER BY POST_ID) AS PREV_POST_ID,
+	            LAG(TITLE, 1, 'N') OVER (ORDER BY POST_ID) AS PREV_POST_TITLE
+	        FROM SU_MENT_POST
+	        WHERE IS_DELETED = 'N'
+	    )
+	    WHERE POST_ID = #{postId}
+	</select>
+	
+	<!-- detail에서 "다음" 게시물의 ID 와 제목을 조회해 이동 -->
+	<select id="selectNextPost" parameterType="long" resultType="kr.or.ddit.startup.mt.vo.SuMentPostVO">
+	    SELECT
+	        NEXT_POST_ID AS nextPostId,
+	        NEXT_POST_TITLE AS nextPostTitle
+	    FROM (
+	        SELECT
+	            POST_ID,
+	            LEAD(POST_ID, 1, 0) OVER (ORDER BY POST_ID) AS NEXT_POST_ID,
+	            LEAD(TITLE, 1, 'N') OVER (ORDER BY POST_ID) AS NEXT_POST_TITLE
+	        FROM SU_MENT_POST
+	        WHERE IS_DELETED = 'N'
+	    )
+	    WHERE POST_ID = #{postId}
+	</select>
+	
+	<!-- 조회수 1 증가 / 새로고침시 무한정 오르는 것을 방지해 쿠키 사용 -->
+	<update id="increaseViewCount" parameterType="long">
+	    UPDATE SU_MENT_POST
+	       SET VIEW_COUNT = VIEW_COUNT + 1
+	     WHERE POST_ID = #{postId}
+	</update>
+	
+	<!-- 관리자 멘토링 게시판 수정 및 삭제 -->
+	<update id="updateMentoringPost" parameterType="kr.or.ddit.startup.mt.vo.SuMentPostVO">
+	    UPDATE SU_MENT_POST
+	    SET
+	        CAT_CODE_ID = #{catCodeId}
+	        ,TITLE = #{title}
+	        ,CONTENT = #{content}
+	        ,UPDATED_AT = SYSDATE
+	        ,LINK_URL = #{linkUrl}
+	        ,DEADLINE = #{deadline}
+	        <if test="fileGroupNo != 0">
+	            ,FILE_GROUP_NO = #{fileGroupNo}
+	        </if>
+	    WHERE
+	        POST_ID = #{postId}
+	</update>
+
+	<update id="deleteMentoringPost" parameterType="long">
+	    UPDATE SU_MENT_POST
+	    SET
+	        IS_DELETED = 'Y'
+	    WHERE
+	        POST_ID = #{postId}
+	</update>
+	
+		
+</mapper>

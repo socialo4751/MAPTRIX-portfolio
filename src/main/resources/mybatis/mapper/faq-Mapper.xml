@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="kr.or.ddit.cs.faq.mapper.CsFaqMapper">
+
+    <!-- 전체 목록 (간단) -->
+    <select id="selectFaqList" resultType="kr.or.ddit.cs.faq.vo.CsFaqVO">
+        SELECT F.FAQ_ID       AS faqId
+             , F.TITLE        AS title
+             , F.CONTENT      AS content
+             , F.CAT_CODE_ID  AS catCodeId
+             , C.CODE_NAME    AS catCodeName
+             , F.FILE_GROUP_NO AS fileGroupNo
+             , F.DEL_YN       AS delYn
+        FROM CS_FAQ F
+                 LEFT JOIN CODE_DETAIL C
+                           ON F.CAT_CODE_ID = C.CODE_ID
+                               AND C.CODE_GROUP_ID = 'FAQTAG'
+        WHERE F.DEL_YN = 'N'
+        ORDER BY F.FAQ_ID DESC
+    </select>
+
+    <!-- 페이징 목록 -->
+    <select id="selectPagedFaqList" resultType="kr.or.ddit.cs.faq.vo.CsFaqVO">
+        SELECT F.FAQ_ID       AS faqId
+        , F.TITLE        AS title
+        , F.CONTENT      AS content
+        , F.CAT_CODE_ID  AS catCodeId
+        , C.CODE_NAME    AS catCodeName
+        , F.FILE_GROUP_NO AS fileGroupNo
+        , F.DEL_YN       AS delYn
+        FROM (
+        SELECT ROWNUM AS rnum, F.*
+        FROM (
+        SELECT *
+        FROM CS_FAQ
+        <where>
+            DEL_YN = 'N'
+            <if test="catCodeId != null and catCodeId != ''">
+                AND CAT_CODE_ID = #{catCodeId}
+            </if>
+            <if test="keyword != null and keyword != ''">
+                AND (
+                TITLE   LIKE '%' || #{keyword} || '%'
+                OR CONTENT LIKE '%' || #{keyword} || '%'
+                )
+            </if>
+        </where>
+        ORDER BY FAQ_ID DESC
+        ) F
+        WHERE ROWNUM &lt;= #{endRow}
+        ) F
+        LEFT JOIN CODE_DETAIL C
+        ON F.CAT_CODE_ID = C.CODE_ID
+        AND C.CODE_GROUP_ID = 'FAQTAG'
+        WHERE rnum &gt;= #{startRow}
+    </select>
+
+    <!-- 총 건수 -->
+    <select id="selectFaqCount" resultType="int">
+        SELECT COUNT(*)
+        FROM CS_FAQ
+        <where>
+            DEL_YN = 'N'
+            <if test="catCodeId != null and catCodeId != ''">
+                AND CAT_CODE_ID = #{catCodeId}
+            </if>
+            <if test="keyword != null and keyword != ''">
+                AND (
+                TITLE   LIKE '%' || #{keyword} || '%'
+                OR CONTENT LIKE '%' || #{keyword} || '%'
+                )
+            </if>
+        </where>
+    </select>
+
+    <!-- 단건 -->
+    <select id="selectFaqById" resultType="kr.or.ddit.cs.faq.vo.CsFaqVO">
+        SELECT F.FAQ_ID        AS faqId
+             , F.TITLE         AS title
+             , F.CONTENT       AS content
+             , F.CAT_CODE_ID   AS catCodeId
+             , C.CODE_NAME     AS catCodeName
+             , F.FILE_GROUP_NO AS fileGroupNo
+             , F.DEL_YN        AS delYn
+        FROM CS_FAQ F
+                 LEFT JOIN CODE_DETAIL C
+                           ON F.CAT_CODE_ID = C.CODE_ID
+                               AND C.CODE_GROUP_ID = 'FAQTAG'
+        WHERE F.FAQ_ID = #{faqId}
+          AND F.DEL_YN = 'N'
+    </select>
+
+    <!-- INSERT (시퀀스명 DB와 맞추세요) -->
+    <insert id="insertFaq" parameterType="kr.or.ddit.cs.faq.vo.CsFaqVO">
+        <selectKey keyProperty="faqId" resultType="int" order="BEFORE">
+            SELECT SEQ_CS_FAQ_ID.NEXTVAL FROM DUAL
+        </selectKey>
+        INSERT INTO CS_FAQ (
+        FAQ_ID, TITLE, CONTENT, CAT_CODE_ID, DEL_YN
+        <if test="fileGroupNo != null and fileGroupNo &gt; 0">, FILE_GROUP_NO</if>
+        ) VALUES (
+        #{faqId}, #{title}, #{content}, #{catCodeId}, NVL(#{delYn}, 'N')
+        <if test="fileGroupNo != null and fileGroupNo &gt; 0">, #{fileGroupNo}</if>
+        )
+    </insert>
+
+    <!-- UPDATE -->
+    <update id="updateFaq" parameterType="kr.or.ddit.cs.faq.vo.CsFaqVO">
+        UPDATE CS_FAQ
+        <set>
+            <if test="title     != null">TITLE = #{title},</if>
+            <if test="content   != null">CONTENT = #{content},</if>
+            <if test="catCodeId != null">CAT_CODE_ID = #{catCodeId},</if>
+            <if test="fileGroupNo != null">
+                FILE_GROUP_NO = #{fileGroupNo},
+            </if>
+        </set>
+        WHERE FAQ_ID = #{faqId}
+    </update>
+
+    <!-- 소프트 삭제 -->
+    <update id="deleteFaq" parameterType="int">
+        UPDATE CS_FAQ
+        SET DEL_YN = 'Y'
+        WHERE FAQ_ID = #{faqId}
+    </update>
+
+</mapper>

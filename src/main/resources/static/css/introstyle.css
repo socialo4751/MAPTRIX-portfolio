@@ -1,0 +1,299 @@
+@font-face {
+    font-family: 'GongGothicMedium';
+    src: url('https://fastly.jsdelivr.net/gh/projectnoonnu/noonfonts_20-10@1.0/GongGothicMedium.woff') format('woff');
+    font-weight: 700;
+    font-style: normal;
+}
+body {
+    color: #343a40;
+}
+.container {
+    display: flex;
+    max-width: 1522px;
+    min-width: 1522px;
+    margin: 50px auto;
+    background-color: #fff;
+    border-radius: 8px;
+    overflow: visible;
+}
+main {
+    flex-grow: 1;
+    padding: 1px 40px 40px 40px;
+    border-radius: 3px;
+}
+.page-header {
+    margin-top: 20px;
+    margin-bottom: 25px;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 15px;
+    font-family: 'GongGothicMedium', sans-serif;
+}
+
+.page-header h2 {
+    font-size: 30px;
+    color: #2c3e50;
+    margin-bottom: 10px;
+}
+.page-header p {
+    font-size: 1.1em;
+    color: #7f8c8d;
+}
+.detail-header {
+    margin-top: 20px;
+    margin-bottom: 40px;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 20px;
+    font-family: 'GongGothicMedium', sans-serif;
+}
+.detail-header h2 {
+    font-size: 30px;
+    color: #2c3e50;
+    margin-bottom: 50px;
+    margin-top: 50px;
+}
+.detail-header p {
+    font-size: 1.1em;
+    color: #7f8c8d;
+}
+.filter-bar {
+    background: #ffffff;
+    border: 1px solid #e3e6f0;
+    border-radius: 0.5rem;
+    padding: 1rem;
+}
+
+.table thead th {
+    border-bottom: 2px solid #e3e6f0;
+    background-color: #ffffff;
+}
+
+.table tbody tr:hover {
+    background-color: #f8f9fc;
+}
+
+.title {
+    font-size: 1.25rem;
+    font-weight: bold;
+    color: #1cc88a; /* ✅ 변경: 녹색 계열 */
+    margin-bottom: 1rem;
+}
+
+.form-label {
+    font-weight: bold;
+}
+
+.btn-submit {
+    background-color: #1cc88a; /* ✅ 변경 */
+    color: white;
+    font-weight: bold;
+}
+
+.btn-submit:hover {
+    background-color: #17a673; /* ✅ 변경 */
+}
+
+.pagination .page-link {
+    border-radius: 0.25rem;
+    color: #6e707e;
+}
+
+.pagination .page-item.active .page-link {
+    background-color: rgba(4, 26, 47, 1); /* ✅ 변경 */
+    border-color: rgba(4, 26, 47, 1); /* ✅ 변경 */
+    color: #fff;
+}
+
+.filter-bar .form-select, .filter-bar .form-control, .filter-bar .btn,
+.filter-bar .input-group-text {
+    height: 38px;
+    font-size: 14px;
+    border-radius: 0.375rem;
+}
+
+.status-badge {
+    font-size: 1rem;
+    padding: 0.6em 1em;
+    border-radius: 0.5rem;
+}
+
+.face-img {
+    height: 130px;
+    background: #e0e0e0;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8rem;
+    color: #666;
+}
+
+.badge-status {
+    font-size: 0.75rem;
+    padding: 0.5em 0.75em;
+    border-radius: 0.375rem;
+}
+
+.badge-pending {
+    background-color: #f6c23e;
+    color: #fff;
+}
+
+.badge-complete {
+    background-color: #1cc88a;
+    color: #fff;
+}
+
+.ck-editor__editable {
+    display: block;
+    width: 100%;
+    padding: 0.375rem 0.75rem;
+    font-size: 1rem;
+    font-weight: 400;
+    line-height: 1.5;
+    color: #212529;
+    background-color: #fff;
+    background-clip: padding-box;
+    border: 1px solid #ced4da;
+    appearance: none;
+    border-radius: 0.25rem;
+    transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+    height: 500px !important;
+    resize: none;
+    margin-bottom: 10px;
+}
+
+.ck-editor__editable:focus {
+    color: #212529;
+    background-color: #fff;
+    border-color: #86b7fe;
+    outline: 0;
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+}
+
+
+
+.search-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-bottom: 2rem;
+    gap: 1rem;
+}
+
+.search-bar .search-tools {
+    display: flex;
+    gap: 0.5rem;
+    min-width: 400px;
+}
+
+.content-wrapper {
+    flex: 1;
+    padding: 2rem;
+    background: #fff;
+    border-radius: 0.5rem;
+/*    box-shadow: 0 .125rem .25rem rgba(0, 0, 0, .075);
+    border: 1px solid #ced4da;*/
+}
+
+table td.notice-title a.notice-link {
+    white-space: normal !important;
+    word-break: break-word !important;
+    overflow-wrap: break-word ! important;
+}
+
+.notice-link {
+    display: block;
+    width: 100%;
+    height: 100%;
+    color: #000;
+    text-decoration: none;
+}
+
+.notice-link:hover {
+    text-decoration: underline !important;
+}
+
+#editor {
+    visibility: hidden;
+}
+
+.notice-title .lock-icon {
+    font-size: 15px; /* 텍스트 크기와 동일하게 */
+    line-height: 1; /* 아이콘 높이를 한 줄 높이로 */
+    color: #6c757d; /* 부트스트랩의 .text-muted 계열 색상 */
+    vertical-align: middle;
+}
+
+.custom-shadow {
+    /* X-offset, Y-offset, blur-radius, spread-radius, color */
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+    border-radius: .75rem; /* 테두리 반경이 더 둥글게 원한다면 조절 */
+}
+
+.sidebar {
+    width: 250px;
+    flex-shrink: 0;
+}
+/* ================================
+   MYPAGE 레이아웃 정렬 고정 (최소패치)
+   - 클래스/마크업 변경 없음
+   - top.jsp 전역 규칙과의 기준선을 맞춤
+================================= */
+
+/* 1) 헤더의 과한 최소폭 해제 (본문과 기준선 어긋남 방지) */
+.header { min-width: 0 !important; }
+
+/* 2) 마이페이지 컨테이너를 헤더 .inner(1440px) 기준선에 맞춤
+   - padding 0으로 헤더와 동일 라인
+   - display:flex는 이미 쓰고 있다면 생략 가능하지만, 안전하게 보강 */
+@media (min-width: 1200px) {
+    .container {
+        max-width: 1440px !important;
+        min-width: 1440px !important; /* ← 이 한 줄이 중요 */
+    }
+}
+.container {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    display: flex;              /* 사이드바 + 메인 한 줄 정렬 */
+    align-items: flex-start;
+    gap: 24px;
+    box-sizing: border-box;
+}
+
+/* 3) 사이드바/메인 기본 폭 보강 (이미 있으면 이 부분은 무시돼도 OK) */
+.container > aside {
+    flex: 0 0 250px;            /* 사이드바 고정폭(프로젝트 값에 맞춰 조정 가능) */
+}
+.container > main {
+    flex: 1 1 auto;
+    min-width: 0;               /* 내용 많은 경우 줄바꿈/넘침 안정화 */
+}
+
+html, body { height: 100%; }
+#wrap { min-height: 100vh; display: flex; flex-direction: column; }
+.site-footer { margin-top: auto; }
+/* 비활성 버튼은 더 흐리게 + 클릭 방지 확정 */
+.pagination .page-item.disabled .page-link{
+    color: #adb5bd !important;   /* 더 옅은 회색으로 */
+    pointer-events: none;         /* 클릭 방지 */
+    background-color: #fff;       /* 필요시 명시 */
+    border-color: #dee2e6;        /* 필요시 명시 */
+    opacity: .65;                 /* 시각적 비활성감 */
+}
+/* BS5 전역: 캐aption 제외 모든 셀을 중앙 정렬 */
+.table > :not(caption) > * > * {
+    vertical-align: middle !important;
+}
+
+/* BS4 호환 + tbody만 중앙 정렬하고 싶다면 */
+.table tbody > tr > th,
+.table tbody > tr > td {
+    vertical-align: middle !important;
+}
+
+/* 머리행까지 중앙정렬 원하면 추가 */
+.table thead > tr > * {
+    vertical-align: middle !important;
+}

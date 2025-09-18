@@ -1,0 +1,192 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.ddit.openapi.apply.mapper.OpenApiMapper">
+
+	<select id="selectApiList"
+		resultType="kr.or.ddit.common.vo.openapi.ApiServiceVO">
+		SELECT
+		SVC.API_ID
+		,CD.CODE_NAME AS apiCategory
+		,SVC.API_NAME_KR
+		,SVC.API_DESC
+		FROM
+		API_SERVICE SVC
+		LEFT JOIN
+		CODE_DETAIL
+		CD ON SVC.API_CATEGORY = CD.CODE_ID
+		ORDER BY
+		SVC.API_ID DESC
+	</select>
+
+	<select id="selectApiById" parameterType="long"
+		resultType="kr.or.ddit.common.vo.openapi.ApiServiceVO">
+		SELECT
+		SVC.API_ID,
+		CATE.CODE_NAME AS apiCategory,
+		SVC.API_NAME_KR,
+		SVC.API_DESC,
+		TYPE.CODE_NAME AS serviceType,
+		FORMAT.CODE_NAME AS supportedFormats,
+		SVC.DATA_SOURCE_INFO,
+		SVC.DAILY_CALL_LIMIT,
+		SVC.BASE_URL,
+		SVC.SWAGGER_URL,
+		SVC.REQUEST_PARAMS_DESC,
+		SVC.SAMPLE_CODE,
+		SVC.API_CAUTIONS,
+		SVC.REQUEST_ENDPOINT,
+		SVC.REQUEST_EXAMPLE,
+		SVC.RESPONSE_EXAMPLE,
+		SVC.SUBSCRIPTION_PERIOD_MONTHS
+		FROM
+		API_SERVICE SVC
+		LEFT JOIN
+		CODE_DETAIL CATE ON SVC.API_CATEGORY = CATE.CODE_ID
+		LEFT JOIN
+		CODE_DETAIL TYPE ON SVC.SERVICE_TYPE = TYPE.CODE_ID
+		LEFT JOIN
+		CODE_DETAIL FORMAT ON SVC.SUPPORTED_FORMATS = FORMAT.CODE_ID
+		WHERE
+		SVC.API_ID = #{apiId}
+	</select>
+
+	<insert id="insertApplication"
+		parameterType="kr.or.ddit.common.vo.openapi.ApiApplicationVO">
+		INSERT INTO API_APPLICATION (
+		APPLICATION_ID
+		,API_ID
+		,USER_ID
+		,PURPOSE_DESC
+		,STATUS
+		,APPLICATED_AT
+		) VALUES (
+		SEQ_API_APPLICATION_ID.NEXTVAL
+		,#{apiId}
+		,#{userId}
+		,#{purposeDesc}
+		,'PENDING'
+		,SYSDATE
+		)
+	</insert>
+
+	<select id="countMySubscriptions" parameterType="string" resultType="int">
+	    SELECT COUNT(*)
+	    FROM API_SUBSCRIPTIONS
+	    WHERE USER_ID = #{userId}
+	</select>
+	
+	<select id="selectMySubscriptionList" parameterType="map"
+		resultType="kr.or.ddit.openapi.apply.vo.MySubscriptionVO">
+		SELECT b.*
+		FROM (
+		    SELECT ROWNUM AS rnum, a.*
+		    FROM (
+				SELECT
+					S.SUBSCRIPTION_ID
+					,S.API_KEY
+					,S.SECRET_KEY
+					,S.STARTED_AT
+					,S.EXPIRED_AT
+					,SVC.API_ID
+					,SVC.API_NAME_KR
+					,SVC.API_DESC
+					,SVC.BASE_URL
+					,SVC.REQUEST_PARAMS_DESC
+					,SVC.SAMPLE_CODE
+					,SVC.API_CAUTIONS
+					,SVC.DAILY_CALL_LIMIT
+					,SVC.REQUEST_ENDPOINT
+					,CATE.CODE_NAME AS apiCategoryName
+					,TYPE.CODE_NAME AS serviceTypeName
+					,FORMAT.CODE_NAME AS supportedFormatsName
+					,SVC.REQUEST_EXAMPLE
+					,SVC.RESPONSE_EXAMPLE
+					,SVC.SUBSCRIPTION_PERIOD_MONTHS
+				FROM
+					API_SUBSCRIPTIONS S
+				JOIN
+					API_SERVICE SVC ON S.API_ID = SVC.API_ID
+				LEFT JOIN
+					CODE_DETAIL CATE ON SVC.API_CATEGORY = CATE.CODE_ID
+				LEFT JOIN
+					CODE_DETAIL TYPE ON SVC.SERVICE_TYPE = TYPE.CODE_ID
+				LEFT JOIN
+					CODE_DETAIL FORMAT ON SVC.SUPPORTED_FORMATS = FORMAT.CODE_ID
+				WHERE
+					S.USER_ID = #{userId}
+				ORDER BY
+					S.STARTED_AT DESC
+		    ) a
+		    WHERE ROWNUM &lt;= #{endRow}
+		) b
+		WHERE b.rnum &gt;= #{startRow}
+	</select>
+
+	<select id="countActiveApplicationOrSubscription" parameterType="map" resultType="int">
+	    SELECT COUNT(*) FROM (
+	        SELECT 1 FROM API_APPLICATION
+	        WHERE USER_ID = #{userId} 
+	          AND API_ID = #{apiId} 
+	          AND STATUS IN ('PENDING', 'APPROVED')
+	        
+	        UNION ALL
+	        
+	        SELECT 1 FROM API_SUBSCRIPTIONS
+	        WHERE USER_ID = #{userId} 
+	          AND API_ID = #{apiId} 
+	          AND (EXPIRED_AT IS NULL OR EXPIRED_AT > SYSDATE)
+	    )
+	</select>
+
+	<select id="countMyApplications" parameterType="map" resultType="int">
+	    SELECT COUNT(*)
+	    FROM API_APPLICATION
+	    WHERE USER_ID = #{userId} AND STATUS = #{status}
+	</select>
+	
+	<select id="selectMyApplications" parameterType="map"
+		resultType="kr.or.ddit.common.vo.openapi.ApiApplicationVO">
+		SELECT b.*
+		FROM (
+		    SELECT ROWNUM AS rnum, a.*
+		    FROM (
+				SELECT
+					app.APPLICATION_ID AS applicationId,
+					app.API_ID AS apiId,
+					app.USER_ID AS userId,
+					app.PURPOSE_DESC AS purposeDesc,
+					app.STATUS AS status,
+					app.APPLICATED_AT AS applicatedAt,
+					svc.API_NAME_KR AS apiNameKr,
+					svc.API_DESC AS apiDesc
+				FROM API_APPLICATION app
+				JOIN API_SERVICE svc ON svc.API_ID = app.API_ID
+				WHERE app.USER_ID = #{userId}
+				AND app.STATUS = #{status}
+				ORDER BY app.APPLICATED_AT DESC
+		    ) a
+		    WHERE ROWNUM &lt;= #{endRow}
+		) b
+		WHERE b.rnum &gt;= #{startRow}
+	</select>
+	
+	<select id="selectPendingAndRejectedApplications"
+		parameterType="string"
+		resultType="kr.or.ddit.common.vo.openapi.ApiApplicationVO">
+		SELECT
+		app.APPLICATION_ID AS applicationId,
+		app.API_ID AS apiId,
+		app.USER_ID AS userId,
+		app.PURPOSE_DESC AS purposeDesc,
+		app.STATUS AS status,
+		app.APPLICATED_AT AS applicatedAt,
+		svc.API_NAME_KR AS apiNameKr,
+		svc.API_DESC AS apiDesc
+		FROM API_APPLICATION app
+		JOIN API_SERVICE svc ON svc.API_ID = app.API_ID
+		WHERE app.USER_ID = #{userId}
+		AND app.STATUS IN ('PENDING','REJECTED')
+		ORDER BY app.APPLICATED_AT DESC
+	</select>
+
+</mapper>

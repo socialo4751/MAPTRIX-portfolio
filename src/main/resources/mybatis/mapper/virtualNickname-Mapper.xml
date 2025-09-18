@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.ddit.community.free.mapper.VirtualNicknameMapper">
+
+    <select id="findNickname" resultType="String">
+        SELECT VIRTUAL_NICKNAME
+        FROM VIRTUAL_NICKNAMES
+        WHERE USER_ID = #{userId} AND ROOM_ID = #{roomId}
+    </select>
+
+    <select id="findUsedNicknamesInRoom" resultType="String">
+        SELECT VIRTUAL_NICKNAME
+        FROM VIRTUAL_NICKNAMES
+        WHERE ROOM_ID = #{roomId}
+    </select>
+
+    <insert id="save" parameterType="kr.or.ddit.community.free.vo.VirtualNicknameVO">
+        INSERT INTO VIRTUAL_NICKNAMES (USER_ID, ROOM_ID, VIRTUAL_NICKNAME)
+        VALUES (#{userId}, #{roomId}, #{virtualNickname})
+    </insert>
+
+</mapper>

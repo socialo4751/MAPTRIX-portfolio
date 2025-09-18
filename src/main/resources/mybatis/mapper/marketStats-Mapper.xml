@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="kr.or.ddit.admin.stats.market.mapper.MarketStatsMapper">
+
+  <sql id="commonWhere">
+    <where>
+        <if test="from != null and from != ''">
+            AND LMA.RUN_AT &gt;= TO_TIMESTAMP(#{from}, 'YYYY-MM-DD')
+        </if>
+        <if test="to != null and to != ''">
+            AND LMA.RUN_AT &lt; TO_TIMESTAMP(#{to}, 'YYYY-MM-DD') + 1
+        </if>
+        <if test="type != null and type != ''">
+            AND LMA.ANALYSIS_TYPE = #{type}
+        </if>
+        <if test="districtId != null">
+            AND LMA.DISTRICT_ID = #{districtId}
+        </if>
+        <if test="admCode != null and admCode != ''">
+            AND LMA.ADM_CODE = #{admCode}
+        </if>
+        <if test="gender != null and gender != ''">
+            AND LMA.GENDER = #{gender}
+        </if>
+        <if test="ageBand != null and ageBand != ''">
+            AND LMA.AGE_BAND = #{ageBand}
+        </if>
+    </where>
+  </sql>
+
+  <select id="selectKpi" resultType="kr.or.ddit.admin.stats.market.vo.MarketStatsKpiVO">
+    SELECT
+      COUNT(*) AS totalCount,
+      COUNT(DISTINCT LMA.USER_ID) AS uniqueUserCount,
+      CASE WHEN COUNT(*) = 0 THEN 0
+           ELSE ROUND(100 * SUM(CASE WHEN LMA.STATUS = 'SUCCESS' THEN 1 ELSE 0 END) / COUNT(*), 2)
+      END AS successRate,
+      NVL(ROUND(AVG(LMA.DURATION_MS), 1), 0) AS avgDurationMs
+    FROM LOG_MARKET_ANALYSIS LMA <include refid="commonWhere"/>
+  </select>
+
+  <select id="selectTopLocations" resultType="kr.or.ddit.admin.stats.market.vo.TopLocationVO">
+    SELECT *
+    FROM (
+      SELECT
+        LMA.ADM_CODE    AS admCode,
+        CAD.ADM_NAME    AS admName,
+        COUNT(*)        AS count
+      FROM LOG_MARKET_ANALYSIS LMA
+      LEFT JOIN CODE_ADM_DONG CAD ON CAD.ADM_CODE = LMA.ADM_CODE
+      <include refid="commonWhere"/>
+      AND LMA.ADM_CODE IS NOT NULL
+      GROUP BY LMA.ADM_CODE, CAD.ADM_NAME
+      ORDER BY COUNT(*) DESC
+    )
+    WHERE ROWNUM &lt;= NVL(#{limit}, 10)
+  </select>
+
+  <select id="selectHourlyCounts" resultType="kr.or.ddit.admin.stats.market.vo.HourlyCountVO">
+    SELECT
+      TO_NUMBER(TO_CHAR(LMA.RUN_AT, 'HH24')) AS "hour",
+      COUNT(*)                               AS count
+    FROM LOG_MARKET_ANALYSIS LMA <include refid="commonWhere"/>
+    GROUP BY TO_CHAR(LMA.RUN_AT, 'HH24')
+    ORDER BY TO_NUMBER(TO_CHAR(LMA.RUN_AT, 'HH24'))
+  </select>
+
+  <select id="selectDemographicCounts" resultType="kr.or.ddit.admin.stats.market.vo.DemographicCountVO">
+    SELECT
+      NVL(LMA.AGE_BAND, 'UNK') AS ageBand,
+      NVL(LMA.GENDER,   'U')   AS gender,
+      COUNT(*)                 AS count
+    FROM LOG_MARKET_ANALYSIS LMA <include refid="commonWhere"/>
+    GROUP BY LMA.AGE_BAND, LMA.GENDER
+    ORDER BY ageBand, gender
+  </select>
+
+  <select id="selectAnalysisTypeCounts" resultType="kr.or.ddit.admin.stats.market.vo.AnalysisTypeCountVO">
+    SELECT
+      LMA.ANALYSIS_TYPE AS analysisType,
+      COUNT(*)          AS count
+    FROM LOG_MARKET_ANALYSIS LMA <include refid="commonWhere"/>
+    GROUP BY LMA.ANALYSIS_TYPE
+    ORDER BY analysisType
+  </select>
+
+  <select id="selectDailyTrends" resultType="kr.or.ddit.admin.stats.market.vo.DailyTrendVO">
+    SELECT
+      TRUNC(LMA.RUN_AT) AS analysisDate,
+      COUNT(*)          AS count
+    FROM LOG_MARKET_ANALYSIS LMA <include refid="commonWhere"/>
+    GROUP BY TRUNC(LMA.RUN_AT)
+    ORDER BY TRUNC(LMA.RUN_AT)
+  </select>
+  
+  <select id="selectLogCount" resultType="int">
+    SELECT COUNT(*)
+    FROM LOG_MARKET_ANALYSIS LMA <include refid="commonWhere"/>
+  </select>
+
+  <select id="selectLogList" resultType="kr.or.ddit.admin.stats.market.vo.LogMarketAnalysisVO">
+    SELECT
+        ANALYSIS_ID, USER_ID, ANALYSIS_TYPE, AGE_BAND, GENDER,
+        LMA.DISTRICT_ID, LMA.ADM_CODE, BIZ_CODE_ID, CHANNEL, CLIENT_IP,
+        GEOM_WKT, PARAM_JSON, CONTEXT_JSON, RESULT_ROWS, DURATION_MS,
+        STATUS, RUN_AT,
+        CD.DISTRICT_NAME AS districtName,
+        CAD.ADM_NAME     AS admName
+    FROM (
+        SELECT
+            ROWNUM AS RNUM, T.*
+        FROM (
+            SELECT *
+            FROM LOG_MARKET_ANALYSIS LMA <include refid="commonWhere"/>
+            ORDER BY LMA.RUN_AT DESC
+        ) T
+        WHERE ROWNUM &lt;= #{endRow}
+    ) LMA
+    LEFT JOIN CODE_DISTRICT CD ON LMA.DISTRICT_ID = CD.DISTRICT_ID
+    LEFT JOIN CODE_ADM_DONG CAD ON LMA.ADM_CODE = CAD.ADM_CODE
+    WHERE LMA.RNUM &gt;= #{startRow}
+  </select>
+
+</mapper>

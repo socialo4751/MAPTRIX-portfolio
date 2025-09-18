@@ -1,0 +1,329 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.ddit.cs.survey.mapper.CsSurveyMapper">
+    <resultMap id="surveyMap" type="kr.or.ddit.cs.survey.vo.CsSurveyVO">
+        <result property="surveyId" column="SURVEY_ID"/>
+        <result property="surveyTitle" column="SURVEY_TITLE"/>
+        <result property="surveyDescription" column="SURVEY_DESCRIPTION"/>
+        <result property="useYn" column="USE_YN"/>
+        <result property="participated" column="PARTICIPATED"/>
+    </resultMap>
+    <select id="selectSurveyList" resultType="kr.or.ddit.cs.survey.vo.CsSurveyVO">
+        SELECT SURVEY_ID,
+               SURVEY_TITLE,
+               SURVEY_DESCRIPTION,
+               USE_YN
+        FROM CS_SURVEY
+        WHERE USE_YN = 'Y'
+        ORDER BY SURVEY_ID DESC
+    </select>
+    <select id="selectSurvey" resultType="kr.or.ddit.cs.survey.vo.CsSurveyVO">
+        SELECT SURVEY_ID          AS surveyId,
+               SURVEY_TITLE       AS surveyTitle,
+               SURVEY_DESCRIPTION AS surveyDescription,
+               USE_YN             AS useYn
+        FROM CS_SURVEY
+        WHERE SURVEY_ID = #{surveyId}
+    </select>
+
+    <select id="selectQuestions" resultType="kr.or.ddit.cs.survey.vo.CsSurveyQuestionVO">
+        SELECT QUESTION_ID    AS questionId,
+               SURVEY_ID      AS surveyId,
+               QUESTION_ORDER AS questionOrder,
+               QUESTION_TEXT  AS questionText
+        FROM CS_SURVEY_QUESTION
+        WHERE SURVEY_ID = #{surveyId}
+        ORDER BY QUESTION_ORDER
+    </select>
+
+    <select id="selectOptions" resultType="kr.or.ddit.cs.survey.vo.CsSurveyOptionVO">
+        SELECT OPTION_ID    AS optionId,
+               QUESTION_ID  AS questionId,
+               OPTION_TEXT  AS optionText,
+               OPTION_VALUE AS optionValue,
+               OPTION_ORDER AS optionOrder
+        FROM CS_SURVEY_OPTION
+        WHERE QUESTION_ID = #{questionId}
+        ORDER BY NVL(OPTION_ORDER, 9999), OPTION_VALUE DESC
+    </select>
+    <insert id="insertSurveyResp" parameterType="kr.or.ddit.cs.survey.vo.CsSurveyRespVO">
+        INSERT INTO CS_SURVEY_RESP (RESPONSE_ID, SURVEY_ID, USER_ID, RESPONSED_AT, TOTAL_VALUE)
+        VALUES (#{responseId}, #{surveyId}, #{userId}, SYSDATE, #{totalValue})
+    </insert>
+
+    <insert id="insertSurveyAnswer" parameterType="kr.or.ddit.cs.survey.vo.CsSurveyAnswerVO">
+        INSERT INTO CS_SURVEY_ANSWER (ANSWER_ID, RESPONSE_ID, QUESTION_ID, OPTION_ID)
+        VALUES (SEQ_CS_SURVEY_ANSWER.NEXTVAL, #{responseId}, #{questionId}, #{optionId})
+    </insert>
+
+    <select id="getSurveyIdByQuestionId" resultType="int">
+        SELECT SURVEY_ID
+        FROM CS_SURVEY_QUESTION
+        WHERE QUESTION_ID = #{questionId}
+    </select>
+
+    <select id="getOptionIdByQuestionAndValue" resultType="int">
+        SELECT OPTION_ID
+        FROM CS_SURVEY_OPTION
+        WHERE QUESTION_ID = #{questionId}
+          AND OPTION_VALUE = #{optionValue}
+    </select>
+    <select id="getNextSurveyRespSeq" resultType="int">
+        SELECT SEQ_CS_SURVEY_RESP.NEXTVAL
+        FROM DUAL
+    </select>
+    <select id="selectSurveyListWithParticipation" resultType="kr.or.ddit.cs.survey.vo.CsSurveyVO">
+        SELECT S.SURVEY_ID,
+               S.SURVEY_TITLE,
+               S.SURVEY_DESCRIPTION,
+               S.USE_YN,
+               CASE
+                   WHEN EXISTS (SELECT 1
+                                FROM CS_SURVEY_RESP R
+                                WHERE R.SURVEY_ID = S.SURVEY_ID
+                                  AND R.USER_ID = #{userId}) THEN 1
+                   ELSE 0
+                   END AS participated
+        FROM CS_SURVEY S
+        WHERE S.USE_YN = 'Y'
+        ORDER BY S.SURVEY_ID DESC
+    </select>
+    <select id="selectAllSurveyList" resultMap="surveyMap">
+        SELECT SURVEY_ID,
+               SURVEY_TITLE,
+               SURVEY_DESCRIPTION,
+               USE_YN
+        FROM CS_SURVEY
+        ORDER BY SURVEY_ID DESC
+    </select>
+
+    <select id="selectAllSurveyListWithCount" resultType="kr.or.ddit.cs.survey.vo.CsSurveyVO">
+        SELECT S.SURVEY_ID,
+               S.SURVEY_TITLE,
+               S.SURVEY_DESCRIPTION,
+               S.USE_YN,
+               (SELECT COUNT(*)
+                FROM CS_SURVEY_RESP R
+                WHERE R.SURVEY_ID = S.SURVEY_ID) AS participantCount
+        FROM CS_SURVEY S
+        ORDER BY S.SURVEY_ID DESC
+    </select>
+    <!-- 기존 selectSurveyPage 교체 (start, end 파라미터 사용) -->
+    <select id="selectSurveyPage" parameterType="map" resultType="kr.or.ddit.cs.survey.vo.CsSurveyVO">
+        SELECT *
+        FROM (
+        SELECT
+        S.SURVEY_ID,
+        S.SURVEY_TITLE,
+        S.SURVEY_DESCRIPTION,
+        S.USE_YN,
+        (SELECT COUNT(*) FROM CS_SURVEY_RESP R WHERE R.SURVEY_ID = S.SURVEY_ID) AS participantCount,
+        ROW_NUMBER() OVER (ORDER BY S.SURVEY_ID DESC) AS rn
+        FROM CS_SURVEY S
+        <where>
+            <if test="keyword != null and keyword != ''">
+                AND S.SURVEY_TITLE LIKE '%' || #{keyword} || '%'
+            </if>
+            <if test="useYn != null and useYn != ''">
+                AND S.USE_YN = #{useYn}
+            </if>
+        </where>
+        )
+        WHERE rn BETWEEN #{start} AND #{end}
+    </select>
+
+    <select id="countSurveys" parameterType="map" resultType="int">
+        SELECT COUNT(*)
+        FROM CS_SURVEY
+        <where>
+            <if test="keyword != null and keyword != ''">
+                AND SURVEY_TITLE LIKE '%' || #{keyword} || '%'
+            </if>
+            <if test="useYn != null and useYn != ''">
+                AND USE_YN = #{useYn}
+            </if>
+        </where>
+    </select>
+    <insert id="insertSurvey" parameterType="kr.or.ddit.cs.survey.vo.CsSurveyVO">
+        <selectKey keyProperty="surveyId" resultType="int" order="BEFORE">
+            SELECT SEQ_CS_SURVEY_ID.NEXTVAL FROM DUAL
+        </selectKey>
+        INSERT INTO CS_SURVEY (SURVEY_ID,
+        SURVEY_TITLE,
+        SURVEY_DESCRIPTION,
+        USE_YN)
+        VALUES (#{surveyId},
+        #{surveyTitle},
+        #{surveyDescription},
+        #{useYn})
+    </insert>
+    <insert id="insertSurveyQuestion" parameterType="kr.or.ddit.cs.survey.vo.CsSurveyQuestionVO">
+        <selectKey keyProperty="questionId" resultType="int" order="BEFORE">
+            SELECT SEQ_CS_SURVEY_QUESTION_ID.NEXTVAL FROM DUAL
+        </selectKey>
+        INSERT INTO CS_SURVEY_QUESTION (
+        QUESTION_ID,
+        SURVEY_ID,
+        QUESTION_ORDER,
+        QUESTION_TEXT
+        ) VALUES (
+        #{questionId},
+        #{surveyId},
+        #{questionOrder},
+        #{questionText}
+        )
+    </insert>
+    <insert id="insertSurveyOption" parameterType="kr.or.ddit.cs.survey.vo.CsSurveyOptionVO">
+        INSERT INTO CS_SURVEY_OPTION (
+        OPTION_ID,
+        QUESTION_ID,
+        OPTION_TEXT,
+        OPTION_VALUE,
+        OPTION_ORDER
+        )
+        VALUES (
+        SEQ_CS_SURVEY_OPTION_ID.NEXTVAL,
+        #{questionId},
+        #{optionText},
+        #{optionValue},
+        #{optionOrder} <!-- 🔺추가 -->
+        )
+    </insert>
+    <update id="updateSurveyStatus" parameterType="kr.or.ddit.cs.survey.vo.CsSurveyVO">
+        UPDATE CS_SURVEY
+        SET USE_YN = #{useYn}
+        WHERE SURVEY_ID = #{surveyId}
+    </update>
+    <!-- 특정 질문의 점수 분포(%) -->
+    <select id="selectQuestionScorePct" parameterType="int" resultType="map">
+        SELECT q.QUESTION_ID                                               AS questionId,
+               q.QUESTION_ORDER                                            AS questionOrder,
+               q.QUESTION_TEXT                                             AS questionText,
+               o.OPTION_VALUE                                              AS optionValue,
+               o.OPTION_TEXT                                               AS optionText,
+               COUNT(a.ANSWER_ID)                                          AS cnt,
+               ROUND(100 * RATIO_TO_REPORT(COUNT(a.ANSWER_ID)) OVER (), 2) AS pct
+        FROM CS_SURVEY_OPTION o
+                 JOIN CS_SURVEY_QUESTION q
+                      ON q.QUESTION_ID = o.QUESTION_ID
+                 LEFT JOIN CS_SURVEY_ANSWER a
+                           ON a.QUESTION_ID = o.QUESTION_ID
+                               AND a.OPTION_ID = o.OPTION_ID
+        WHERE q.QUESTION_ID = #{questionId}
+        GROUP BY q.QUESTION_ID, q.QUESTION_ORDER, q.QUESTION_TEXT,
+                 o.OPTION_VALUE, o.OPTION_TEXT
+        ORDER BY o.OPTION_VALUE DESC
+    </select>
+    <!-- 설문 전체의 질문별 점수 분포(%) -->
+    <select id="selectSurveyScorePct" parameterType="int" resultType="map">
+        SELECT q.SURVEY_ID                                                                           AS surveyId,
+               q.QUESTION_ID                                                                         AS questionId,
+               q.QUESTION_ORDER                                                                      AS questionOrder,
+               q.QUESTION_TEXT                                                                       AS questionText,
+               o.OPTION_VALUE                                                                        AS optionValue,
+               o.OPTION_TEXT                                                                         AS optionText,
+               COUNT(a.ANSWER_ID)                                                                    AS cnt,
+               ROUND(100 * RATIO_TO_REPORT(COUNT(a.ANSWER_ID)) OVER (PARTITION BY q.QUESTION_ID), 2) AS pct
+        FROM CS_SURVEY_OPTION o
+                 JOIN CS_SURVEY_QUESTION q
+                      ON q.QUESTION_ID = o.QUESTION_ID
+                 LEFT JOIN CS_SURVEY_ANSWER a
+                           ON a.QUESTION_ID = o.QUESTION_ID
+                               AND a.OPTION_ID = o.OPTION_ID
+        WHERE q.SURVEY_ID = #{surveyId}
+        GROUP BY q.SURVEY_ID, q.QUESTION_ID, q.QUESTION_ORDER, q.QUESTION_TEXT,
+                 o.OPTION_VALUE, o.OPTION_TEXT
+        ORDER BY q.QUESTION_ORDER, o.OPTION_VALUE DESC
+    </select>
+    <select id="selectParticipationTrend" parameterType="int" resultType="map">
+        SELECT TRUNC(RESPONSED_AT) AS respDate,
+               COUNT(*)            AS cnt
+        FROM CS_SURVEY_RESP
+        WHERE SURVEY_ID = #{surveyId}
+        GROUP BY TRUNC(RESPONSED_AT)
+        ORDER BY respDate
+    </select>
+    <select id="selectTotalValueHistogram" parameterType="int" resultType="map">
+        SELECT TOTAL_VALUE AS totalValue,
+               COUNT(*)    AS cnt
+        FROM CS_SURVEY_RESP
+        WHERE SURVEY_ID = #{surveyId}
+        GROUP BY TOTAL_VALUE
+        ORDER BY totalValue
+    </select>
+    <select id="selectRespondentsByScore" parameterType="map" resultType="kr.or.ddit.cs.survey.vo.CsSurveyRespVO">
+        SELECT r.RESPONSE_ID,
+               r.USER_ID,
+               r.RESPONSED_AT
+        FROM CS_SURVEY_RESP r
+                 JOIN CS_SURVEY_ANSWER a ON a.RESPONSE_ID = r.RESPONSE_ID
+                 JOIN CS_SURVEY_OPTION o ON o.OPTION_ID = a.OPTION_ID
+        WHERE a.QUESTION_ID = #{questionId}
+          AND o.OPTION_VALUE = #{optionValue}
+        ORDER BY r.RESPONSED_AT DESC
+    </select>
+    <!-- 성별 분포: USERS.GENDER ('M','F' 등). 없으면 'U'(미상)로 처리 -->
+    <select id="selectSurveyGenderPct" parameterType="int" resultType="map">
+        SELECT NVL(U.GENDER, 'U')                                AS GENDER,
+               COUNT(*)                                          AS CNT,
+               ROUND(100 * RATIO_TO_REPORT(COUNT(*)) OVER (), 2) AS PCT
+        FROM CS_SURVEY_RESP R
+                 LEFT JOIN USERS U ON U.USER_ID = R.USER_ID
+        WHERE R.SURVEY_ID = #{surveyId}
+        GROUP BY NVL(U.GENDER, 'U')
+        ORDER BY GENDER
+    </select>
+
+    <!-- 연령대 분포: 10/20/30/40/50/60+ / 미상 -->
+    <select id="selectSurveyAgeBuckets" parameterType="int" resultType="map">
+        WITH BASE AS (SELECT FLOOR(MONTHS_BETWEEN(SYSDATE, U.BIRTH_DATE) / 12) AS AGE
+                      FROM CS_SURVEY_RESP R
+                               LEFT JOIN USERS U ON U.USER_ID = R.USER_ID
+                      WHERE R.SURVEY_ID = #{surveyId})
+        SELECT BUCKET,
+               COUNT(*)                                          AS CNT,
+               ROUND(100 * RATIO_TO_REPORT(COUNT(*)) OVER (), 2) AS PCT
+        FROM (SELECT CASE
+                         WHEN AGE IS NULL THEN '미상'
+                         WHEN AGE &lt; 20 THEN '10대'
+                         WHEN AGE &lt; 30 THEN '20대'
+                         WHEN AGE &lt; 40 THEN '30대'
+                         WHEN AGE &lt; 50 THEN '40대'
+                         WHEN AGE &lt; 60 THEN '50대'
+                         ELSE '60대+'
+                         END AS BUCKET
+              FROM BASE)
+        GROUP BY BUCKET
+        ORDER BY CASE BUCKET
+                     WHEN '10대' THEN 10
+                     WHEN '20대' THEN 20
+                     WHEN '30대' THEN 30
+                     WHEN '40대' THEN 40
+                     WHEN '50대' THEN 50
+                     WHEN '60대+' THEN 60
+                     ELSE 999
+                     END
+    </select>
+    <select id="selectLatestResponseId" resultType="int">
+        SELECT RESPONSE_ID
+        FROM CS_SURVEY_RESP
+        WHERE SURVEY_ID = #{surveyId}
+          AND USER_ID   = #{userId}
+        ORDER BY RESPONSED_AT DESC
+            FETCH FIRST 1 ROWS ONLY
+    </select>
+
+    <select id="selectAnswersByResponseId" resultType="kr.or.ddit.cs.survey.vo.CsSurveyAnswerVO">
+        SELECT ANSWER_ID, RESPONSE_ID, QUESTION_ID, OPTION_ID
+        FROM CS_SURVEY_ANSWER
+        WHERE RESPONSE_ID = #{responseId}
+    </select>
+
+    <select id="selectSubmittedAt" resultType="date">
+        SELECT RESPONSED_AT
+        FROM CS_SURVEY_RESP
+        WHERE RESPONSE_ID = #{responseId}
+    </select>
+
+
+</mapper>

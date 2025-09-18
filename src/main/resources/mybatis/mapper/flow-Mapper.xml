@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.ddit.attraction.flow.mapper.FlowMapper">
+	<insert id="insertLocation" parameterType="HashMap">
+		INSERT INTO
+		ST_FLOW_LOG(
+			LOG_ID
+			,USER_ID
+			,POLY_ID
+			,LOG_LAT
+			,LOG_LON
+			,CREATED_AT
+		) 
+		VALUES(
+			SEQ_ST_FLOW_LOG_ID.NEXTVAL
+			,#{userId}
+			,#{sessionId}
+			,#{lat}
+			,#{lon}
+			,SYSDATE
+		)
+	</insert>
+	
+	<insert id="insertPloyId" parameterType="HashMap">
+	    <selectKey resultType="long" keyProperty="sessionId" order="BEFORE">
+	        SELECT SEQ_ST_POLY_DATA_ID.NEXTVAL FROM DUAL
+	    </selectKey>
+	    
+		INSERT INTO
+		ST_POLY_DATA(
+			POLY_ID
+			,USER_ID
+		) 
+		VALUES(
+			#{sessionId}
+			,#{userId}
+		)
+	</insert>
+	
+	<select id="dayFlow" resultType="kr.or.ddit.attraction.flow.vo.StFlowLogVO" parameterType="HashMap">
+		SELECT
+			LOG_ID, USER_ID, POLY_ID, LOG_LON, LOG_LAT, CREATED_AT
+		FROM
+			ST_FLOW_LOG
+		WHERE 
+			TRUNC(CREATED_AT) = TO_DATE(#{day}, 'YYYY-MM-DD')
+			AND USER_ID = #{userId}
+			
+			<!-- 	폴리그룹 셀렉트	
+		SELECT
+		  POLY_ID,
+		  JSON_ARRAYAGG(
+		    JSON_OBJECT('lon' VALUE LOG_LON, 'lat' VALUE LOG_LAT)
+		  ) AS logList,
+		  JSON_ARRAYAGG(LOG_ID) AS logIds
+		FROM ST_FLOW_LOG
+		WHERE 
+		  TRUNC(CREATED_AT) = TO_DATE('2025-08-05', 'YYYY-MM-DD')
+		  AND USER_ID = 'admin@test.com'
+		GROUP BY POLY_ID -->
+	</select>
+	
+	<select id="dayFlowKm" resultType="java.lang.Double" parameterType="HashMap">
+		WITH
+		  base_data AS (
+		    SELECT
+		      POLY_ID,
+		      JSON_ARRAYAGG(
+		        JSON_OBJECT('lon' VALUE LOG_LON, 'lat' VALUE LOG_LAT)
+		        ORDER BY CREATED_AT ASC
+		        RETURNING CLOB
+		      ) AS logList
+		    FROM ST_FLOW_LOG
+		    WHERE
+		    	USER_ID = #{userId}
+		    <if test="day != null and day != ''">
+		    	AND TRUNC(CREATED_AT) = TO_DATE(#{day}, 'YYYY-MM-DD')
+		    </if>
+		    GROUP BY
+		      POLY_ID
+		  ),
+		  unpacked_points AS (
+		    SELECT
+		      b.POLY_ID,
+		      jt.seq,
+		      jt.lat,
+		      jt.lon
+		    FROM
+		      base_data b,
+		      JSON_TABLE(
+		        b.logList,
+		        '$[*]'
+		        COLUMNS (
+		          seq FOR ORDINALITY,
+		          lat NUMBER PATH '$.lat',
+		          lon NUMBER PATH '$.lon'
+		        )
+		      ) jt
+		  ),
+		  point_pairs AS (
+		    SELECT
+		      POLY_ID,
+		      lat,
+		      lon,
+		      LAG(lat, 1, NULL) OVER (PARTITION BY POLY_ID ORDER BY seq) AS prev_lat,
+		      LAG(lon, 1, NULL) OVER (PARTITION BY POLY_ID ORDER BY seq) AS prev_lon
+		    FROM
+		      unpacked_points
+		  ),
+		  segment_distances AS (
+		    SELECT
+		      POLY_ID,
+		      CASE
+		        WHEN prev_lat IS NULL THEN 0
+		        ELSE
+		          -- 6371은 지구의 평균 반지름 (킬로미터 단위)
+		          (
+		            2 * 6371 * ASIN(
+		              SQRT(
+		                POWER(SIN(((lat - prev_lat) * ACOS(-1) / 180) / 2), 2) + COS(prev_lat * ACOS(-1) / 180) * COS(lat * ACOS(-1) / 180) * POWER(SIN(((lon - prev_lon) * ACOS(-1) / 180) / 2), 2)
+		              )
+		            )
+		          )
+		      END AS distance_in_kilometers
+		    FROM
+		      point_pairs
+		  )
+		SELECT 
+			SUM(total_distance_kilometers)
+		FROM(
+			SELECT
+			  SUM(distance_in_kilometers) AS total_distance_kilometers
+			FROM
+			  segment_distances
+			GROUP BY
+			  POLY_ID
+		) total_distances
+	</select>
+	
+	<select id="getClaimedDistance" parameterType="HashMap">
+		SELECT 
+			NVL(SUM(CLAIMED_DISTANCE), 0) AS TOTAL_CLAIMED_DISTANCE
+		FROM 
+			ST_USER_DISTANCE_CLAIM
+		WHERE
+			USER_ID = #{userId}
+	</select>
+</mapper>

@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.ddit.user.signin.mapper.UserSocialMapper">
+
+    <resultMap id="socialMap" type="kr.or.ddit.user.signin.vo.UserSocialVO">
+        <id     column="PROVIDER"          property="provider"/>
+        <id     column="PROVIDER_USER_ID"  property="providerUserId"/>
+        <result column="USER_ID"           property="userId"/>
+        <result column="ACCESS_TOKEN"      property="accessToken"/>
+        <result column="REFRESH_TOKEN"     property="refreshToken"/>
+    </resultMap>
+
+    <select id="selectByProviderAndProviderUserId" resultMap="socialMap">
+        SELECT
+            USER_ID, PROVIDER, PROVIDER_USER_ID, ACCESS_TOKEN, REFRESH_TOKEN
+        FROM
+            USER_SOCIAL
+        WHERE
+            PROVIDER = #{provider} AND PROVIDER_USER_ID = #{providerUserId}
+    </select>
+
+    <insert id="insertSocial" parameterType="kr.or.ddit.user.signin.vo.UserSocialVO">
+        INSERT INTO USER_SOCIAL
+            (USER_ID, PROVIDER, PROVIDER_USER_ID, ACCESS_TOKEN, REFRESH_TOKEN)
+        VALUES
+            (#{userId}, #{provider}, #{providerUserId}, #{accessToken}, #{refreshToken})
+    </insert>
+
+    <update id="updateAccessToken">
+        UPDATE
+            USER_SOCIAL
+        SET
+            ACCESS_TOKEN = #{accessToken}
+        WHERE
+            PROVIDER = #{provider} AND PROVIDER_USER_ID = #{providerUserId}
+    </update>
+
+</mapper>

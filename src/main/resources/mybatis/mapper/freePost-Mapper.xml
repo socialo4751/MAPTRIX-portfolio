@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="kr.or.ddit.community.free.mapper.FreePostMapper">
+
+    <!-- ★★★★★ [수정 1] resultMap의 줄바꿈 오류를 수정했습니다. ★★★★★ -->
+    <resultMap id="freePostMap" type="kr.or.ddit.community.free.vo.CommFreePostVO">
+        <id property="postId" column="POST_ID"/>
+        <result property="userId" column="USER_ID"/>
+        <result property="bizCodeId" column="CAT_CODE_ID"/>
+        <result property="title" column="TITLE"/>
+        <result property="content" column="CONTENT"/>
+        <result property="viewCount" column="VIEW_COUNT"/>
+        <result property="createdAt" column="CREATED_AT"/>
+        <result property="updatedAt" column="UPDATED_AT"/>
+        <result property="fileGroupNo" column="FILE_GROUP_NO"/>
+    </resultMap>
+
+    <!-- 카테고리(상권 코드)별 게시글 목록 + 키워드 + 페이징(Oracle ROWNUM) -->
+    <select id="selectPostsByBizCode" parameterType="map"
+            resultType="kr.or.ddit.community.free.vo.CommFreePostVO">
+        SELECT
+            POST_ID, USER_ID, CAT_CODE_ID, TITLE, VIEW_COUNT, CREATED_AT, RNUM
+        FROM (
+            SELECT
+                ROWNUM AS PAGINATION_RNUM, A.*
+            FROM (
+                SELECT
+                    POST_ID, USER_ID, CAT_CODE_ID, TITLE, VIEW_COUNT, CREATED_AT,
+                    ROW_NUMBER() OVER (PARTITION BY CAT_CODE_ID ORDER BY POST_ID ASC) AS RNUM
+                FROM COMM_FREE_POST
+                WHERE
+                    CAT_CODE_ID = #{bizCodeId}
+                    AND IS_DELETED = 'N'
+                    <if test="keyword != null and keyword != ''">
+                        AND (TITLE LIKE '%' || #{keyword} || '%'
+                             OR CONTENT LIKE '%' || #{keyword} || '%')
+                    </if>
+                ORDER BY POST_ID DESC
+            ) A
+            WHERE ROWNUM &lt;= #{endRow}
+        )
+        WHERE PAGINATION_RNUM &gt;= #{startRow}
+    </select>
+
+    <!-- 카테고리별 게시글 개수(검색 포함) -->
+    <select id="countPostsByBizCode" parameterType="map" resultType="int">
+        SELECT COUNT(*)
+        FROM COMM_FREE_POST
+        WHERE
+            CAT_CODE_ID = #{bizCodeId}
+            AND IS_DELETED = 'N'
+            <if test="keyword != null and keyword != ''">
+                AND (TITLE LIKE '%' || #{keyword} || '%'
+                     OR CONTENT LIKE '%' || #{keyword} || '%')
+            </if>
+    </select>
+
+    <!-- ★★★★★ [수정 2] 게시글 단건 조회 시 resultType 대신 resultMap을 사용하도록 변경 ★★★★★ -->
+    <select id="selectPostById" parameterType="int" resultMap="freePostMap">
+        SELECT
+            POST_ID, USER_ID, CAT_CODE_ID, TITLE, CONTENT,
+            VIEW_COUNT, CREATED_AT, UPDATED_AT, FILE_GROUP_NO
+        FROM COMM_FREE_POST
+        WHERE POST_ID = #{postId}	
+          AND IS_DELETED = 'N'
+    </select>
+
+    <!-- 조회수 증가 -->
+    <update id="incrementViewCount" parameterType="int">
+        UPDATE COMM_FREE_POST
+        SET VIEW_COUNT = VIEW_COUNT + 1
+        WHERE POST_ID = #{postId}
+    </update>
+
+    <!-- 게시글 등록 -->
+    <insert id="insertPost"
+            parameterType="kr.or.ddit.community.free.vo.CommFreePostVO">
+        <selectKey keyProperty="postId" resultType="int" order="BEFORE">
+            SELECT SEQ_COMM_FREE_POST.NEXTVAL FROM DUAL
+        </selectKey>
+        INSERT INTO COMM_FREE_POST (
+            POST_ID, USER_ID, CAT_CODE_ID, TITLE, CONTENT, FILE_GROUP_NO
+        ) VALUES (
+            #{postId}, #{userId}, #{catCodeId}, #{title}, #{content}, #{fileGroupNo}
+        )
+    </insert>
+
+    <!-- 게시글 수정 -->
+    <update id="updatePost"
+            parameterType="kr.or.ddit.community.free.vo.CommFreePostVO">
+        UPDATE COMM_FREE_POST
+        <set>
+            <if test="title != null and title != ''">TITLE = #{title},</if>
+            <if test="content != null and content != ''">CONTENT = #{content},</if>
+            <if test="fileGroupNo != null and fileGroupNo > 0">FILE_GROUP_NO = #{fileGroupNo},</if>
+            UPDATED_AT = SYSDATE
+        </set>
+        WHERE POST_ID = #{postId}
+    </update>
+
+    <!-- 소프트 삭제 -->
+    <update id="softDeletePostById" parameterType="int">
+        UPDATE COMM_FREE_POST
+        SET IS_DELETED = 'Y',
+            UPDATED_AT = SYSDATE
+        WHERE POST_ID = #{postId}
+    </update>
+    
+    <select id="countPostsByUserId" parameterType="string" resultType="int">
+	    SELECT COUNT(*)
+	    FROM COMM_FREE_POST
+	    WHERE USER_ID = #{userId} AND IS_DELETED = 'N'
+	</select>
+	
+	<select id="selectPostsByUserId" parameterType="map" resultType="kr.or.ddit.community.free.vo.CommFreePostVO">
+	    SELECT POST_ID, TITLE, CREATED_AT
+	    FROM COMM_FREE_POST
+	    WHERE USER_ID = #{userId} AND IS_DELETED = 'N'
+	    ORDER BY CREATED_AT DESC
+	</select>
+
+	 <select id="selectLatestFreePost" resultType="kr.or.ddit.community.free.vo.CommFreePostVO">
+        SELECT
+            POST_ID AS "postId",
+            TITLE   AS "title"
+        FROM (
+            SELECT
+                POST_ID,
+                TITLE,
+                CREATED_AT
+            FROM COMM_FREE_POST
+            WHERE IS_DELETED = 'N'  -- [수정 1] DELETED_AT IS NULL -> IS_DELETED = 'N'
+            ORDER BY CREATED_AT DESC
+        )
+        WHERE ROWNUM = 1
+    </select>
+</mapper>

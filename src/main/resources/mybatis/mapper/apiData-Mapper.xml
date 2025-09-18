@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.ddit.openapi.data.mapper.ApiDataMapper">
+
+	<select id="getBusinessStats" parameterType="map" resultType="kr.or.ddit.openapi.data.vo.ApiStatsBusinessVO">
+        <choose>
+            <when test="bizLevel == 1">
+                SELECT ADM_CODE, STATS_YEAR, BIZ_CODE_ID, STATS_VALUE
+                FROM STATS_BIZ_LARGE
+            </when>
+            <when test="bizLevel == 2">
+                SELECT ADM_CODE, STATS_YEAR, BIZ_CODE_ID, STATS_VALUE
+                FROM STATS_BIZ_MEDIUM
+            </when>
+        </choose>
+        <where>
+            <if test="year != null and year != ''">
+                AND STATS_YEAR = #{year}
+            </if>
+            <if test="admCode != null and admCode != ''">
+                AND ADM_CODE LIKE #{admCode} || '%'
+            </if>
+            <if test="bizCodeId != null and bizCodeId != ''">
+                AND BIZ_CODE_ID = #{bizCodeId}
+            </if>
+        </where>
+    </select>
+    
+    <select id="getEmployeeStats" parameterType="map" resultType="kr.or.ddit.openapi.data.vo.ApiStatsEmployeeVO">
+        <choose>
+            <when test="bizLevel == 1">
+                SELECT ADM_CODE, STATS_YEAR, BIZ_CODE_ID, STATS_VALUE
+                FROM STATS_EMP_LARGE
+            </when>
+            <when test="bizLevel == 2">
+                SELECT ADM_CODE, STATS_YEAR, BIZ_CODE_ID, STATS_VALUE
+                FROM STATS_EMP_MEDIUM
+            </when>
+        </choose>
+        <where>
+            <if test="year != null and year != ''">
+                AND STATS_YEAR = #{year}
+            </if>
+            <if test="admCode != null and admCode != ''">
+                AND ADM_CODE LIKE #{admCode} || '%'
+            </if>
+            <if test="bizCodeId != null and bizCodeId != ''">
+                AND BIZ_CODE_ID = #{bizCodeId}
+            </if>
+        </where>
+    </select>
+    
+    <select id="getCreditCardStats" parameterType="map" resultType="kr.or.ddit.openapi.data.vo.ApiStatsCreditCardVO">
+        SELECT ADM_CODE, STATS_YEAR, AVG_PAYMENT_AMOUNT
+        FROM STATS_CREDIT_CARD
+        <where>
+            <if test="year != null and year != ''">
+                AND STATS_YEAR = #{year}
+            </if>
+            <if test="admCode != null and admCode != ''">
+                AND ADM_CODE LIKE #{admCode} || '%'
+            </if>
+        </where>
+    </select>
+    
+    <select id="getHouseholdStats" parameterType="map" resultType="kr.or.ddit.openapi.data.vo.ApiStatsHouseholdVO">
+        SELECT ADM_CODE, STATS_YEAR, STATS_VALUE
+        FROM STATS_HOUSEHOLD
+        <where>
+            <if test="year != null and year != ''">
+                AND STATS_YEAR = #{year}
+            </if>
+            <if test="admCode != null and admCode != ''">
+                AND ADM_CODE LIKE #{admCode} || '%'
+            </if>
+        </where>
+    </select>
+
+    <select id="getHousingStats" parameterType="map" resultType="kr.or.ddit.openapi.data.vo.ApiStatsHousingVO">
+        SELECT ADM_CODE, STATS_YEAR, STATS_VALUE
+        FROM STATS_HOUSING
+        <where>
+            <if test="year != null and year != ''">
+                AND STATS_YEAR = #{year}
+            </if>
+            <if test="admCode != null and admCode != ''">
+                AND ADM_CODE LIKE #{admCode} || '%'
+            </if>
+        </where>
+    </select>
+
+    <select id="getPopulationStats" parameterType="map" resultType="kr.or.ddit.openapi.data.vo.ApiStatsPopulationVO">
+        SELECT ADM_CODE, STATS_YEAR, STATS_VALUE
+        FROM STATS_POPULATION
+        <where>
+            <if test="year != null and year != ''">
+                AND STATS_YEAR = #{year}
+            </if>
+            <if test="admCode != null and admCode != ''">
+                AND ADM_CODE LIKE #{admCode} || '%'
+            </if>
+        </where>
+    </select>
+</mapper>

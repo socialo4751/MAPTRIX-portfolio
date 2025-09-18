@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.ddit.bizstats.chart.mapper.BizChartMapper">
+
+    <select id="selectBizStartClose" resultType="kr.or.ddit.common.vo.stats.StatsBizStartCloseVO">
+        SELECT
+            district_name,
+            startup_count,
+            closure_count,
+            active_count,
+            startup_rate,
+            closure_rate
+        FROM
+            STATS_BIZ_START_CLOSE
+        ORDER BY
+            CASE
+                WHEN district_name = '대전시' THEN 0
+                ELSE 1
+            END,
+            district_name ASC
+    </select>
+	
+	<!-- 자치구별 사업체 현황 목록 조회 -->
+	<select id="selectDistrictBusiness" resultType="kr.or.ddit.common.vo.stats.StatsBizStartVO">
+        SELECT
+            DISTRICT_NAME,
+            ACTIVE_COUNT,
+            SHARE_RATE
+        FROM
+            STATS_BIZ_START
+        ORDER BY
+            ACTIVE_COUNT DESC
+    </select>
+	
+	<!-- 자치구별 생활밀접업종 기본현황 -->
+	<select id="selectBizStartCommon" resultType="kr.or.ddit.common.vo.stats.StatsBizStartCommonVO">
+        SELECT
+            DISTRICT_NAME,
+            BUSINESS_COUNT,
+            BUSINESS_RATIO,
+            EMPLOYEE_COUNT,
+            EMPLOYEE_RATIO,
+            SALES_AMOUNT,
+            SALES_RATIO,
+            AVG_SALES_AMOUNT,
+            AVG_OPERATING_PERIOD
+        FROM
+            STATS_BIZ_START_COMMON
+        ORDER BY
+            CASE
+                WHEN DISTRICT_NAME = '대전시' THEN 0
+                ELSE 1
+            END,
+            DISTRICT_NAME ASC
+    </select>
+	
+	<!-- 자치구별 소상공인 사업체 수 -->
+	<select id="selectSmallbizStats" resultType="kr.or.ddit.common.vo.stats.StatsBizStartSmallbizVO">
+        SELECT
+            DISTRICT_NAME,
+            BIZ_COUNT,
+            SHARE_RATE
+        FROM
+            STATS_BIZ_START_SMALLBIZ
+        ORDER BY
+            BIZ_COUNT DESC
+    </select>
+    
+	<!-- 매출액 규모 -->
+	<select id="selectSalesRangeStats" resultType="kr.or.ddit.common.vo.stats.StatsBizStartSalesrangeVO">
+        SELECT
+            SALES_RANGE,
+            TOTAL_BIZ_COUNT,
+            SMALLBIZ_COUNT,
+            COMMON_BIZ_COUNT
+        FROM 
+            STATS_BIZ_START_SALESRANGE
+        ORDER BY
+            CASE SALES_RANGE
+                WHEN '5천만원 미만'     THEN 1
+                WHEN '5천만원 ~ 1억원' THEN 2
+                WHEN '1~2억원'        THEN 3
+                WHEN '2~5억원'        THEN 4
+                WHEN '5억원 이상'     THEN 5
+                ELSE 99
+            END
+    </select>
+	<!-- 3개년 현황 -->
+	<select id="selectBizTrendStats" resultType="kr.or.ddit.common.vo.stats.StatsBizStartTrendVO">
+        SELECT
+            BASE_YEAR,
+            BIZ_COUNT,
+            EMPLOYEE_COUNT,
+            SALES_AMOUNT
+        FROM
+            STATS_BIZ_START_TREND
+        ORDER BY
+            BASE_YEAR ASC
+    </select>
+	
+</mapper>

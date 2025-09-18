@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="kr.or.ddit.admin.stats.system.mapper.SystemLogMapper">
+
+    <!-- 카테고리(ex_kr.or.ddit.admin) & 로그레벨(INFO,ERROR...) 필터: logger_name 패키지 prefix로 분기) -->
+<sql id="commonWhere">
+    <where>
+        <if test="searchStartDate != null and searchStartDate != ''">
+            AND timestmp &gt;= (TO_DATE(#{searchStartDate}, 'YYYY-MM-DD') - DATE '1970-01-01') * 86400000
+        </if>
+        <if test="searchEndDate != null and searchEndDate != ''">
+            AND timestmp &lt; (TO_DATE(#{searchEndDate}, 'YYYY-MM-DD') + 1 - DATE '1970-01-01') * 86400000
+        </if>
+        <if test="category != null and category != ''">
+            <choose>
+                <when test="category == 'security'">
+                    AND logger_name LIKE 'org.springframework.security.%'
+                </when>
+                <when test="category == 'admin'">
+                    AND logger_name LIKE 'kr.or.ddit.admin.%'
+                </when>
+                <when test="category == 'attraction'">
+                    AND logger_name LIKE 'kr.or.ddit.attraction.%'
+                </when>
+                <when test="category == 'community'">
+                    AND logger_name LIKE 'kr.or.ddit.community.%'
+                </when>
+                <when test="category == 'market'">
+                    AND logger_name LIKE 'kr.or.ddit.market.%'
+                </when>
+                <when test="category == 'startup'">
+                    AND logger_name LIKE 'kr.or.ddit.startup.%'
+                </when>
+                <otherwise>
+                    AND logger_name LIKE 'kr.or.ddit.%'
+                </otherwise>
+            </choose>
+        </if>
+
+        <if test="levelString != null and levelString != ''">
+            <choose>
+                <when test="levelString == 'SYS_ERROR'">
+                    AND level_string = 'ERROR'
+                </when>
+                <when test="levelString == 'SYS_WARN'">
+                    AND level_string = 'WARN'
+                </when>
+                <when test="levelString == 'SYS_INFO'">
+                    AND level_string = 'INFO'
+                </when>
+                <when test="levelString == 'SYS_DEBUG'">
+                    AND level_string = 'DEBUG'
+                </when>
+            </choose>
+        </if>
+    </where>
+</sql>
+
+    <!-- 총 개수 -->
+    <select id="countLogs" parameterType="map" resultType="int">
+        SELECT COUNT(*)
+        FROM LOGGING_EVENT
+        <include refid="commonWhere"/>
+    </select>
+
+    <!-- 목록 (페이징: offset/size) -->
+    <select id="findLogs" parameterType="map"
+            resultType="kr.or.ddit.admin.stats.system.vo.LoggingEventVO">
+        SELECT
+        event_id,
+        CAST((
+        FROM_TZ(TIMESTAMP '1970-01-01 00:00:00', 'UTC')
+        + NUMTODSINTERVAL(timestmp/1000, 'SECOND')
+        ) AT TIME ZONE 'Asia/Seoul' AS DATE) AS "timestamp",
+        formatted_message,
+        logger_name,
+        level_string,
+        thread_name,
+        reference_flag,
+        arg0, arg1, arg2, arg3,
+        caller_filename, caller_class, caller_method, caller_line
+        FROM (
+        SELECT ROWNUM AS rnum, a.*
+        FROM (
+        SELECT *
+        FROM LOGGING_EVENT
+        <include refid="commonWhere"/>
+        ORDER BY event_id DESC
+        ) a
+        WHERE ROWNUM &lt;= #{offset} + #{size}
+        )
+        WHERE rnum &gt; #{offset}
+    </select>
+  
+  <select id="selectLogLevelSummary" resultType="map">
+    SELECT
+        COUNT(*) AS TOTAL_COUNT,
+        COUNT(CASE WHEN level_string = 'ERROR' THEN 1 END) AS ERROR_COUNT,
+        COUNT(CASE WHEN level_string = 'WARN' THEN 1 END) AS WARN_COUNT,
+        COUNT(CASE WHEN level_string = 'INFO' THEN 1 END) AS INFO_COUNT,
+        COUNT(CASE WHEN level_string = 'DEBUG' THEN 1 END) AS DEBUG_COUNT
+    FROM LOGGING_EVENT
+</select>
+
+
+</mapper>

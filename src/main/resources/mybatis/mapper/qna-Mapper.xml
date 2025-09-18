@@ -1,0 +1,346 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.ddit.cs.qna.mapper.CsQnaPostMapper">
+
+    <!-- ResultMap 정의 -->
+    <resultMap id="QnaPostResultMap"
+               type="kr.or.ddit.cs.qna.vo.CsQnaPostVO">
+        <id property="quesId" column="QUES_ID"/>
+        <result property="userId" column="USER_ID"/>
+        <result property="writerName" column="WRITER_NAME"/>
+        <result property="catCodeId" column="CAT_CODE_ID"/>
+        <result property="catCodeName" column="CAT_CODE_NAME"/>
+        <result property="title" column="TITLE"/>
+        <result property="content" column="CONTENT"/>
+        <result property="viewCount" column="VIEW_COUNT"/>
+        <result property="createdAt" column="CREATED_AT"/>
+        <result property="updatedAt" column="UPDATED_AT"/>
+        <result property="isDeleted" column="IS_DELETED"/>
+        <result property="fileGroupNo" column="FILE_GROUP_NO"/>
+        <result property="publicYn" column="PUBLIC_YN"/>
+        <result property="answered" column="ANSWERED"/>
+
+        <!-- 답변 컬럼 추가 -->
+        <result property="ansId" column="ANS_ID"/>
+        <result property="answerContent" column="ANS_CONTENT"/>
+        <result property="answeredAt" column="ANSWERED_AT"/>
+    </resultMap>
+
+    <!-- 1) 전체 QnA 조회 -->
+    <select id="selectAllQnas" resultMap="QnaPostResultMap">
+        SELECT p.QUES_ID,
+               p.USER_ID,
+               p.CAT_CODE_ID,
+               d.CODE_NAME                                          AS CAT_CODE_NAME,
+               p.TITLE,
+               p.CONTENT,
+               p.VIEW_COUNT,
+               p.CREATED_AT,
+               p.UPDATED_AT,
+               p.IS_DELETED,
+               p.FILE_GROUP_NO,
+               p.PUBLIC_YN,
+               u.NAME                                               AS WRITER_NAME,
+               CASE WHEN a.ANS_ID IS NOT NULL THEN 'Y' ELSE 'N' END AS ANSWERED
+        FROM CS_QNA_POST p
+                 JOIN USERS u
+                      ON p.USER_ID = u.USER_ID
+                 LEFT JOIN CODE_DETAIL d
+                           ON d.CODE_GROUP_ID = 'QNATAG'
+                               AND d.CODE_ID = p.CAT_CODE_ID
+                 LEFT JOIN CS_ANSWER a ON p.QUES_ID = a.QUES_ID
+        ORDER BY p.CREATED_AT DESC
+    </select>
+
+    <!-- 2) 단일 QnA 조회 -->
+    <!-- 고객센터와 관리자페이지에서 모두 사용하는 쿼리 -->
+    <select id="selectQnaById" parameterType="int"
+            resultMap="QnaPostResultMap">
+        SELECT
+        p.QUES_ID,
+        p.USER_ID,
+        p.CAT_CODE_ID,
+        d.CODE_NAME AS CAT_CODE_NAME,
+        p.TITLE,
+        p.CONTENT,
+        p.VIEW_COUNT,
+        p.CREATED_AT,
+        p.UPDATED_AT,
+        p.IS_DELETED,
+        p.FILE_GROUP_NO,
+        p.PUBLIC_YN,
+        a.ANS_ID,
+        a.CONTENT AS ANS_CONTENT,
+        a.ANSWERED_AT,
+        u.NAME AS WRITER_NAME,
+        CASE WHEN a.ANS_ID IS NOT NULL THEN 'Y' ELSE 'N' END AS ANSWERED  <!-- 추가 -->
+        FROM CS_QNA_POST p
+        JOIN USERS u ON p.USER_ID = u.USER_ID
+        LEFT JOIN CODE_DETAIL d
+        ON d.CODE_GROUP_ID = 'QNATAG'
+        AND d.CODE_ID = p.CAT_CODE_ID
+        LEFT JOIN CS_ANSWER a ON p.QUES_ID = a.QUES_ID   <!-- 추가 -->
+        WHERE p.QUES_ID = #{quesId}
+    </select>
+
+
+    <!-- 3) QnA 등록 -->
+    <insert id="insertQna"
+            parameterType="kr.or.ddit.cs.qna.vo.CsQnaPostVO">
+        <selectKey keyProperty="quesId" resultType="int"
+                   order="BEFORE">
+            SELECT SEQ_CS_QNA_POST_ID.NEXTVAL FROM DUAL
+        </selectKey>
+        INSERT INTO CS_QNA_POST
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            QUES_ID,
+            USER_ID,
+            CAT_CODE_ID,
+            TITLE,
+            CONTENT,
+            VIEW_COUNT,
+            CREATED_AT,
+            IS_DELETED,
+            PUBLIC_YN
+            <if test="fileGroupNo != null and fileGroupNo > 0">, FILE_GROUP_NO</if>
+        </trim>
+        <trim prefix="VALUES (" suffix=")" suffixOverrides=",">
+            #{quesId},
+            #{userId},
+            #{catCodeId},
+            #{title},
+            #{content},
+            0,
+            SYSDATE,
+            'N',
+            #{publicYn}
+            <if test="fileGroupNo != null and fileGroupNo > 0">, #{fileGroupNo}</if>
+        </trim>
+    </insert>
+
+    <!-- 4) QnA 수정 -->
+    <update id="updateQna"
+            parameterType="kr.or.ddit.cs.qna.vo.CsQnaPostVO">
+        UPDATE CS_QNA_POST
+        <set>
+            <if test="catCodeId != null">CAT_CODE_ID = #{catCodeId},</if>
+            <if test="title    != null">TITLE = #{title},</if>
+            <if test="content  != null">CONTENT = #{content},</if>
+            UPDATED_AT = SYSDATE,
+            <if test="isDeleted != null">IS_DELETED = #{isDeleted},</if>
+            <if test="fileGroupNo != null and fileGroupNo > 0">FILE_GROUP_NO = #{fileGroupNo},</if>
+            <if test="publicYn != null">PUBLIC_YN = #{publicYn}</if>
+        </set>
+        WHERE QUES_ID = #{quesId}
+    </update>
+
+    <!-- 5) 조회수 증가 -->
+    <update id="incrementViewCount" parameterType="int">
+        UPDATE CS_QNA_POST
+        SET VIEW_COUNT = VIEW_COUNT + 1
+        WHERE QUES_ID = #{quesId}
+    </update>
+
+    <!-- 6) 전체 건수 조회 (페이징용) -->
+    <select id="selectQnaCount" parameterType="hashMap"
+            resultType="int">
+        SELECT COUNT(*)
+        FROM CS_QNA_POST p
+        JOIN USERS u ON p.USER_ID = u.USER_ID
+        <where>
+            p.IS_DELETED = 'N'
+            <if test="catCodeId != null and catCodeId != ''">
+                AND p.CAT_CODE_ID = #{catCodeId}
+            </if>
+            <if test="keyword != null and keyword != ''">
+                <choose>
+                    <when test="searchType == 'SC101'">
+                        AND ( UPPER(p.TITLE) LIKE '%' || UPPER(#{keyword}) || '%'
+                        OR UPPER(p.CONTENT) LIKE '%' || UPPER(#{keyword}) || '%' )
+                    </when>
+                    <when test="searchType == 'SC102'">
+                        AND UPPER(p.TITLE) LIKE '%' || UPPER(#{keyword}) || '%'
+                    </when>
+                    <when test="searchType == 'SC103'">
+                        AND UPPER(p.CONTENT) LIKE '%' || UPPER(#{keyword}) || '%'
+                    </when>
+                    <when test="searchType == 'SC104'">
+                        AND UPPER(u.NAME) LIKE '%' || UPPER(#{keyword}) || '%'
+                    </when>
+                    <otherwise>
+                        AND ( UPPER(p.TITLE) LIKE '%' || UPPER(#{keyword}) || '%'
+                        OR UPPER(p.CONTENT) LIKE '%' || UPPER(#{keyword}) || '%' )
+                    </otherwise>
+                </choose>
+            </if>
+        </where>
+    </select>
+
+    <!-- 7) 페이징 처리된 목록 조회 -->
+    <select id="selectQnasByPage" parameterType="hashMap" resultMap="QnaPostResultMap">
+        SELECT
+        QUES_ID, USER_ID, CAT_CODE_ID, CAT_CODE_NAME, TITLE,
+        CONTENT, VIEW_COUNT, CREATED_AT, UPDATED_AT, IS_DELETED,
+        FILE_GROUP_NO, PUBLIC_YN, WRITER_NAME, ANSWERED, RNUM
+        FROM (
+        SELECT
+        p.QUES_ID,
+        p.USER_ID,
+        p.CAT_CODE_ID,
+        d.CODE_NAME AS CAT_CODE_NAME,
+        p.TITLE,
+        p.CONTENT,
+        p.VIEW_COUNT,
+        p.CREATED_AT,
+        p.UPDATED_AT,
+        p.IS_DELETED,
+        p.FILE_GROUP_NO,
+        p.PUBLIC_YN,
+        u.NAME AS WRITER_NAME,
+        CASE WHEN a.ANS_ID IS NOT NULL THEN 'Y' ELSE 'N' END AS ANSWERED,
+        ROW_NUMBER() OVER (ORDER BY p.CREATED_AT DESC) AS RNUM
+        FROM CS_QNA_POST p
+        JOIN USERS u ON p.USER_ID = u.USER_ID
+        LEFT JOIN CODE_DETAIL d ON d.CODE_GROUP_ID = 'QNATAG' AND d.CODE_ID = p.CAT_CODE_ID
+        LEFT JOIN CS_ANSWER a ON p.QUES_ID = a.QUES_ID
+        <where>
+            p.IS_DELETED = 'N'
+            <if test="catCodeId != null and catCodeId != ''">
+                AND p.CAT_CODE_ID = #{catCodeId}
+            </if>
+            <if test="keyword != null and keyword != ''">
+                <choose>
+                    <when test="searchType == 'SC101'">
+                        AND ( UPPER(p.TITLE) LIKE '%' || UPPER(#{keyword}) || '%'
+                        OR UPPER(p.CONTENT) LIKE '%' || UPPER(#{keyword}) || '%' )
+                    </when>
+                    <when test="searchType == 'SC102'">
+                        AND UPPER(p.TITLE) LIKE '%' || UPPER(#{keyword}) || '%'
+                    </when>
+                    <when test="searchType == 'SC103'">
+                        AND UPPER(p.CONTENT) LIKE '%' || UPPER(#{keyword}) || '%'
+                    </when>
+                    <when test="searchType == 'SC104'">
+                        AND UPPER(u.NAME) LIKE '%' || UPPER(#{keyword}) || '%'
+                    </when>
+                    <otherwise>
+                        AND ( UPPER(p.TITLE) LIKE '%' || UPPER(#{keyword}) || '%'
+                        OR UPPER(p.CONTENT) LIKE '%' || UPPER(#{keyword}) || '%' )
+                    </otherwise>
+                </choose>
+            </if>
+        </where>
+        )
+        WHERE RNUM BETWEEN #{startRow} AND #{endRow}
+        ORDER BY RNUM
+    </select>
+
+
+    <update id="markQnaAsDeleted" parameterType="int">
+        UPDATE CS_QNA_POST
+        SET IS_DELETED = 'Y',
+            UPDATED_AT = SYSDATE
+        WHERE QUES_ID = #{quesId}
+    </update>
+
+    <!-- 답변 쿼리 -->
+
+    <insert id="insertAnswer"
+            parameterType="kr.or.ddit.cs.qna.vo.CsQnaAnswerVO">
+        <selectKey keyProperty="ansId" resultType="int"
+                   order="BEFORE">
+            SELECT SEQ_CS_ANSWER_ID.NEXTVAL FROM DUAL
+        </selectKey>
+        INSERT INTO CS_ANSWER (
+        ANS_ID, QUES_ID, ADMIN_ID, CONTENT, ANSWERED_AT, FILE_GROUP_NO
+        ) VALUES (
+        #{ansId}, #{quesId}, #{adminId}, #{content}, SYSDATE, #{fileGroupNo}
+        )
+    </insert>
+
+    <update id="updateAnswer"
+            parameterType="kr.or.ddit.cs.qna.vo.CsQnaAnswerVO">
+        UPDATE CS_ANSWER
+        SET CONTENT       = #{content},
+            FILE_GROUP_NO = #{fileGroupNo},
+            ANSWERED_AT   = SYSDATE
+        WHERE ANS_ID = #{ansId}
+    </update>
+
+    <delete id="deleteAnswer" parameterType="int">
+        DELETE
+        FROM CS_ANSWER
+        WHERE ANS_ID = #{ansId}
+    </delete>
+
+    <select id="selectAnswerByQuesId" parameterType="int"
+            resultType="kr.or.ddit.cs.qna.vo.CsQnaAnswerVO">
+        SELECT ANS_ID,
+               QUES_ID,
+               ADMIN_ID,
+               CONTENT,
+               ANSWERED_AT,
+               FILE_GROUP_NO
+        FROM CS_ANSWER
+        WHERE QUES_ID = #{quesId}
+    </select>
+
+    <!-- 관리자 페이지에서 답변 완료인지 아닌지 확인후 리스트 조회 -->
+    <!-- 상태별 전체 건수 -->
+    <select id="selectQnaCountByAnsweredYn" parameterType="string" resultType="int">
+        SELECT COUNT(*)
+        FROM CS_QNA_POST p
+                 LEFT JOIN CS_ANSWER a ON p.QUES_ID = a.QUES_ID
+        WHERE p.IS_DELETED = 'N'
+          AND (CASE WHEN a.ANS_ID IS NULL THEN 'N' ELSE 'Y' END) = #{answeredYn}
+    </select>
+
+
+    <!-- 상태별 페이징 리스트 -->
+    <select id="selectQnasByAnsweredYnPaged" parameterType="map" resultMap="QnaPostResultMap">
+        SELECT QUES_ID,
+               USER_ID,
+               CAT_CODE_ID,
+               TITLE,
+               CONTENT,
+               VIEW_COUNT,
+               CREATED_AT,
+               UPDATED_AT,
+               IS_DELETED,
+               FILE_GROUP_NO,
+               PUBLIC_YN,
+               WRITER_NAME,
+               ANS_ID,
+               ANS_CONTENT,
+               ANSWERED_AT,
+               ANSWERED,
+               RNUM
+        FROM (SELECT p.QUES_ID,
+                     p.USER_ID,
+                     p.CAT_CODE_ID,
+                     p.TITLE,
+                     p.CONTENT,
+                     p.VIEW_COUNT,
+                     p.CREATED_AT,
+                     p.UPDATED_AT,
+                     p.IS_DELETED,
+                     p.FILE_GROUP_NO,
+                     p.PUBLIC_YN,
+                     u.NAME                                               AS WRITER_NAME,
+                     a.ANS_ID,
+                     a.CONTENT                                            AS ANS_CONTENT,
+                     a.ANSWERED_AT,
+                     CASE WHEN a.ANS_ID IS NOT NULL THEN 'Y' ELSE 'N' END AS ANSWERED,
+                     ROW_NUMBER()                                            OVER (ORDER BY p.CREATED_AT DESC) AS RNUM
+              FROM CS_QNA_POST p
+                       LEFT JOIN CS_ANSWER a ON p.QUES_ID = a.QUES_ID
+                       JOIN USERS u ON p.USER_ID = u.USER_ID
+              WHERE p.IS_DELETED = 'N'
+                AND (CASE WHEN a.ANS_ID IS NULL THEN 'N' ELSE 'Y' END) = #{answeredYn})
+        WHERE RNUM BETWEEN #{startRow} AND #{endRow}
+        ORDER BY RNUM
+    </select>
+
+</mapper>

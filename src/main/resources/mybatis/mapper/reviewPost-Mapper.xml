@@ -1,0 +1,202 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+ "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper
+	namespace="kr.or.ddit.community.review.mapper.ReviewPostMapper">
+
+	<resultMap id="ReviewPostResultMap"
+		type="kr.or.ddit.community.review.vo.CommReviewPostVO">
+		<id property="postId" column="POST_ID" />
+		<result property="userId" column="USER_ID" />
+		<result property="writerName" column="WRITER_NAME" />
+		<result property="catCodeId" column="CAT_CODE_ID" />
+		<result property="catCodeName" column="CAT_CODE_NAME" />
+		<result property="title" column="TITLE" />
+		<result property="content" column="CONTENT" />
+		<result property="viewCount" column="VIEW_COUNT" />
+		<result property="createdAt" column="CREATED_AT" />
+		<result property="updatedAt" column="UPDATED_AT" />
+		<result property="isDeleted" column="IS_DELETED" />
+		<result property="fileGroupNo" column="FILE_GROUP_NO" />
+	</resultMap>
+
+	<insert id="insertPost"
+		parameterType="kr.or.ddit.community.review.vo.CommReviewPostVO">
+		<selectKey keyProperty="postId" resultType="int"
+			order="BEFORE">
+			SELECT SEQ_COMM_REVIEW_POST.NEXTVAL FROM DUAL
+		</selectKey>
+		INSERT INTO COMM_REVIEW_POST (
+		POST_ID,
+		USER_ID,
+		CAT_CODE_ID,
+		TITLE,
+		CONTENT,
+		FILE_GROUP_NO
+		) VALUES (
+		#{postId},
+		#{userId},
+		#{catCodeId},
+		#{title},
+		#{content},
+		#{fileGroupNo}
+		)
+	</insert>
+
+	<!-- 리뷰 게시글 상세 조회 (게시글 ID로 단일 게시글 조회) -->
+	<select id="selectPostById" parameterType="int"
+		resultMap="ReviewPostResultMap">
+		SELECT
+		p.POST_ID, p.USER_ID, p.CAT_CODE_ID, p.TITLE,
+		p.CONTENT, p.VIEW_COUNT,
+		p.CREATED_AT, p.UPDATED_AT, p.IS_DELETED,
+		p.FILE_GROUP_NO,
+		u.NAME AS WRITER_NAME,
+		d.CODE_NAME AS CAT_CODE_NAME
+		FROM COMM_REVIEW_POST p
+		JOIN USERS u ON p.USER_ID = u.USER_ID
+		LEFT JOIN
+		CODE_DETAIL d
+		ON d.CODE_GROUP_ID = 'REVIEWTAG' AND d.CODE_ID =
+		p.CAT_CODE_ID
+		WHERE p.POST_ID = #{postId} AND p.IS_DELETED = 'N'
+	</select>
+
+	<!-- 전체 리뷰 게시글 목록 조회 (최신순 정렬) -->
+	<select id="selectAllPosts" resultMap="ReviewPostResultMap">
+		SELECT
+		p.POST_ID,
+		p.USER_ID, p.CAT_CODE_ID, p.TITLE, p.CONTENT, p.VIEW_COUNT,
+		p.CREATED_AT, p.UPDATED_AT, p.IS_DELETED, p.FILE_GROUP_NO,
+		u.NAME AS
+		WRITER_NAME,
+		d.CODE_NAME AS CAT_CODE_NAME
+		FROM COMM_REVIEW_POST p
+		JOIN
+		USERS u ON p.USER_ID = u.USER_ID
+		LEFT JOIN CODE_DETAIL d
+		ON
+		d.CODE_GROUP_ID = 'REVIEWTAG'
+		AND d.CODE_ID = p.CAT_CODE_ID
+		WHERE
+		p.IS_DELETED = 'N'
+		ORDER BY p.CREATED_AT DESC
+	</select>
+
+	<update id="updatePost"
+		parameterType="kr.or.ddit.community.review.vo.CommReviewPostVO">
+		UPDATE COMM_REVIEW_POST
+		<set>
+			<if test="catCodeId != null"> CAT_CODE_ID = #{catCodeId},</if>
+			<if test="title      != null"> TITLE = #{title},</if>
+			<if test="content    != null"> CONTENT = #{content},</if>
+			UPDATED_AT = SYSDATE
+			<if test="fileGroupNo != null and fileGroupNo > 0">
+				, FILE_GROUP_NO = #{fileGroupNo}
+			</if>
+		</set>
+		WHERE POST_ID = #{postId} AND IS_DELETED = 'N'
+	</update>
+
+	<update id="deletePost" parameterType="int">
+		UPDATE COMM_REVIEW_POST
+		SET
+		IS_DELETED = 'Y',
+		UPDATED_AT = SYSDATE
+		WHERE POST_ID = #{postId}
+	</update>
+
+	<update id="incrementViewCount" parameterType="int">
+		UPDATE
+		COMM_REVIEW_POST
+		SET VIEW_COUNT = VIEW_COUNT + 1
+		WHERE POST_ID =
+		#{postId} AND IS_DELETED = 'N'
+	</update>
+
+	<select id="selectPostCount" parameterType="hashMap"
+		resultType="int">
+		SELECT COUNT(*)
+		FROM COMM_REVIEW_POST p
+		JOIN USERS u ON p.USER_ID =
+		u.USER_ID
+		<where>
+			p.IS_DELETED = 'N'
+			<if test="catCodeId != null and catCodeId != ''">
+				AND p.CAT_CODE_ID = #{catCodeId}
+			</if>
+			<if test="keyword != null and keyword != ''">
+				<choose>
+					<when test="searchType == 'SC102'"> AND UPPER(p.TITLE) LIKE '%' || UPPER(#{keyword})
+						|| '%'
+					</when>
+					<when test="searchType == 'SC103'"> AND UPPER(p.CONTENT) LIKE '%' || UPPER(#{keyword})
+						|| '%'
+					</when>
+					<when test="searchType == 'SC104'"> AND UPPER(u.NAME) LIKE '%' || UPPER(#{keyword}) ||
+						'%'
+					</when>
+					<otherwise> AND (UPPER(p.TITLE) LIKE '%' || UPPER(#{keyword}) ||
+						'%' OR UPPER(p.CONTENT) LIKE '%' || UPPER(#{keyword}) || '%')
+					</otherwise>
+				</choose>
+			</if>
+		</where>
+	</select>
+
+	<!-- 페이지별 리뷰 게시글 목록 조회 (검색, 카테고리 필터링, 페이징 지원) -->
+	<select id="selectPostsByPage" parameterType="hashMap"
+		resultMap="ReviewPostResultMap">
+		SELECT *
+		FROM (
+		SELECT
+		p.POST_ID, p.USER_ID, p.CAT_CODE_ID, p.TITLE, p.CONTENT, p.VIEW_COUNT,
+		p.CREATED_AT, p.UPDATED_AT, p.IS_DELETED, p.FILE_GROUP_NO,
+		u.NAME AS WRITER_NAME,
+		d.CODE_NAME AS CAT_CODE_NAME,
+		ROWNUM AS RNUM
+		FROM COMM_REVIEW_POST p
+		JOIN USERS u ON p.USER_ID = u.USER_ID
+		LEFT JOIN CODE_DETAIL d ON d.CODE_GROUP_ID = 'REVIEWTAG' AND d.CODE_ID =
+		p.CAT_CODE_ID
+		<where>
+			p.IS_DELETED = 'N'
+			<if test="catCodeId != null and catCodeId != ''">
+				AND p.CAT_CODE_ID = #{catCodeId}
+			</if>
+			<if test="keyword != null and keyword != ''">
+				<choose>
+					<when test="searchType == 'SC102'"> AND UPPER(p.TITLE) LIKE '%' || UPPER(#{keyword})
+						|| '%'
+					</when>
+					<when test="searchType == 'SC103'"> AND UPPER(p.CONTENT) LIKE '%' || UPPER(#{keyword})
+						|| '%'
+					</when>
+					<when test="searchType == 'SC104'"> AND UPPER(u.NAME) LIKE '%' || UPPER(#{keyword}) ||
+						'%'
+					</when>
+					<otherwise> AND (UPPER(p.TITLE) LIKE '%' || UPPER(#{keyword}) ||
+						'%' OR UPPER(p.CONTENT) LIKE '%' || UPPER(#{keyword}) || '%')
+					</otherwise>
+				</choose>
+			</if>
+		</where>
+		ORDER BY p.CREATED_AT DESC
+		)
+		WHERE RNUM BETWEEN #{startRow} AND #{endRow}
+	</select>
+	
+	<select id="countPostsByUserId" parameterType="string" resultType="int">
+	    SELECT COUNT(*)
+	    FROM COMM_REVIEW_POST
+	    WHERE USER_ID = #{userId} AND IS_DELETED = 'N'
+	</select>
+	
+	<select id="selectPostsByUserId" parameterType="string" resultType="kr.or.ddit.community.review.vo.CommReviewPostVO">
+	    SELECT POST_ID, TITLE, CREATED_AT
+	    FROM COMM_REVIEW_POST
+	    WHERE USER_ID = #{userId} AND IS_DELETED = 'N'
+	    ORDER BY CREATED_AT DESC
+	</select>
+</mapper>

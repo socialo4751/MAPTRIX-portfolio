@@ -1,0 +1,335 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.ddit.attraction.stamp.mapper.StampMapper">
+
+	<!-- 위치 정보 관련 -->
+	<select id="checkArea" resultType="hashMap" parameterType="hashMap">
+		SELECT T.AREA_ID, T.SIG_CD, T.AREA_SQKM, T.GEOM_WKT
+		FROM CODE_AREAS T
+		WHERE SDO_RELATE(
+		    T.GEOM_SDO_4326,
+		    MDSYS.SDO_GEOMETRY(2001, 4326, MDSYS.SDO_POINT_TYPE(#{lon}, #{lat}, NULL), NULL, NULL),
+		    'mask=ANYINTERACT'
+		) = 'TRUE'
+		ORDER BY
+		    SDO_GEOM.SDO_DISTANCE(
+		        T.GEOM_SDO_4326,
+		        MDSYS.SDO_GEOMETRY(2001, 4326, MDSYS.SDO_POINT_TYPE(#{lon}, #{lat}, NULL), NULL, NULL),
+		        0.005, 'unit=M'
+		    ) ASC
+		FETCH FIRST 1 ROWS ONLY
+	</select>
+	
+	<select id="checkRoad" resultType="hashMap" parameterType="hashMap">
+		SELECT 
+			ROAD_NAME,
+			ROAD_ID,
+			GEOM_WKT,
+			SDO_GEOM.SDO_DISTANCE(
+				POLY_GEOM,
+				SDO_GEOMETRY(2001, 4326, SDO_POINT_TYPE(#{lon}, #{lat}, NULL), NULL, NULL),
+				0.0002 -- tolerance
+			) AS DISTANCE
+		FROM CODE_ROAD_NAME
+		WHERE POLY_GEOM IS NOT NULL
+		ORDER BY DISTANCE
+		FETCH FIRST 1 ROWS ONLY
+	</select>
+	
+	<select id="checkStore" resultType="hashMap" parameterType="hashMap">
+		SELECT *
+		FROM (
+			SELECT 
+				STORE_ID,
+				STORE_NAME,
+				LATITUDE,
+				LONGITUDE,
+				6371 * ACOS(
+					COS(#{lon} * ACOS(-1) / 180) * COS(LATITUDE * ACOS(-1) / 180) *
+					COS((LONGITUDE - #{lat}) * ACOS(-1) / 180) +
+					SIN(#{lon} * ACOS(-1) / 180) * SIN(LATITUDE * ACOS(-1) / 180)
+				) AS DISTANCE
+			FROM STATS_DATA_STORE_INFO
+			WHERE LATITUDE IS NOT NULL AND LONGITUDE IS NOT NULL
+		)
+		ORDER BY DISTANCE
+		FETCH FIRST 1 ROWS ONLY
+	</select>
+
+	<!-- 스탬프 정보 조회 -->
+	<select id="stampInfoByAreaAndRoad" resultType="kr.or.ddit.attraction.stamp.vo.StStampVO" parameterType="hashMap">
+		SELECT
+			ROAD_ID, RN_IDX
+		FROM
+			ST_STAMP_CK
+		WHERE 
+			BAS_ID = #{area}
+			AND ROAD_ID = #{road} 
+	</select>
+	
+	<select id="myStampByCode" resultType="kr.or.ddit.attraction.stamp.vo.StStampVO" parameterType="hashMap">
+		SELECT
+			STAMP_ID,
+			USER_ID,
+			AREA_ID,
+			ROAD_ID,
+			CREATED_AT
+		FROM
+			ST_STAMP
+		<where>
+			USER_ID = #{userId}
+			<if test="areaId != null and areaId != ''">
+				AND AREA_ID = #{areaId}
+			</if>
+		</where>
+	</select>
+	
+	<select id="getDayStamp" resultType="kr.or.ddit.attraction.stamp.vo.StStampVO" parameterType="hashMap">
+		SELECT
+			STAMP_ID, USER_ID, AREA_ID, ROAD_ID, CREATED_AT
+		FROM
+			ST_STAMP
+		WHERE 
+			TRUNC(CREATED_AT) = TO_DATE(#{day}, 'YYYY-MM-DD')
+			AND USER_ID = #{userId}
+	</select>
+	
+	<select id="checkStamp" resultType="kr.or.ddit.attraction.stamp.vo.StStampVO" parameterType="kr.or.ddit.attraction.stamp.vo.StStampVO">
+		SELECT 
+			STAMP_ID,
+			USER_ID,
+			AREA_ID,
+			ROAD_ID,
+			CREATED_AT
+        FROM
+        	ST_STAMP
+        WHERE
+        	USER_ID = #{userId}
+        AND AREA_ID = #{areaId}
+        AND ROAD_ID = #{roadId}
+	</select>
+	
+	<!-- 스탬프 카드 관련 -->
+	<select id="checkStampCard" resultType="kr.or.ddit.attraction.stamp.vo.StCardVO" parameterType="kr.or.ddit.attraction.stamp.vo.StStampVO">
+		SELECT
+		    T2.USER_ID,
+		    T1.AREA_ID,
+		    MAX(COALESCE(T2.STAMP_COUNT, 0)) AS STAMP_COUNT,
+		    MAX(COALESCE(T3.STAMP_CK_COUNT, 0)) AS STAMP_CK_COUNT
+		FROM ST_CARD T1
+		LEFT JOIN (
+		    SELECT USER_ID, AREA_ID, COUNT(*) AS STAMP_COUNT
+		    FROM ST_STAMP
+		    GROUP BY USER_ID, AREA_ID
+		) T2 ON T1.USER_ID = T2.USER_ID
+		     AND T1.AREA_ID = T2.AREA_ID
+		LEFT JOIN (
+		    SELECT BAS_ID, COUNT(BAS_ID) AS STAMP_CK_COUNT
+		    FROM ST_STAMP_CK
+		    GROUP BY BAS_ID
+		) T3 ON T1.AREA_ID = T3.BAS_ID
+		WHERE T1.USER_ID = #{userId}
+		  AND T1.AREA_ID = #{areaId}
+		GROUP BY T2.USER_ID, T1.AREA_ID
+	</select>
+	
+	<insert id="insertStampCard" parameterType="kr.or.ddit.attraction.stamp.vo.StCardVO">
+		INSERT INTO ST_CARD(
+			USER_ID,
+			AREA_ID,
+			CREATED_AT
+        )
+        VALUES(
+        	#{userId},
+        	#{areaId},
+        	SYSDATE
+        )
+	</insert>
+	
+	<!-- 스탬프 생성 -->
+	<insert id="insertStamp" parameterType="kr.or.ddit.attraction.stamp.vo.StStampVO">
+		INSERT INTO ST_STAMP(
+			STAMP_ID,
+			USER_ID,
+			AREA_ID,
+			ROAD_ID,
+			CREATED_AT
+        )
+        VALUES(
+        	SEQ_ST_STAMP_ID.NEXTVAL,
+        	#{userId},
+        	#{areaId},
+        	#{roadId},
+        	SYSDATE
+        )
+	</insert>
+	
+	<!-- 스탬프카드 완료 체크 -->
+	
+	
+	
+	<!-- 지도위상점 정보 -->
+	<select id="selectStore" resultType="hashMap" parameterType="hashMap">
+		SELECT
+		    T.STORE_ID
+		    , T.STORE_NAME
+		    , T.BRANCH_NAME
+		    , T.MAIN_INDUSTRY_CODE
+		    , T.MAIN_INDUSTRY_NAME
+		    , T.MID_INDUSTRY_CODE
+		    , T.MID_INDUSTRY_NAME
+		    , T.SUB_INDUSTRY_CODE
+		    , T.SUB_INDUSTRY_NAME
+		    , T.STANDARD_INDUSTRY_CODE
+		    , T.STANDARD_INDUSTRY_NAME
+		    , T.SIDO_CODE, T.SIDO_NAME
+		    , T.SIGUNGU_CODE
+		    , T.SIGUNGU_NAME
+		    , T.ADMIN_DONG_CODE
+		    , T.ADMIN_DONG_NAME
+		    , T.LEGAL_DONG_CODE
+		    , T.LEGAL_DONG_NAME
+		    , T.JIBUN_CODE
+		    , T.LAND_DIVISION_CODE
+		    , T.LAND_DIVISION_NAME
+		    , T.JIBUN_MAIN_NUMBER
+		    , T.JIBUN_SUB_NUMBER
+		    , T.JIBUN_ADDRESS
+		    , T.ROAD_CODE
+		    , T.ROAD_NAME
+		    , T.BUILDING_MAIN_NUMBER
+		    , T.BUILDING_SUB_NUMBER
+		    , T.BUILDING_MGMT_NUMBER
+		    , T.BUILDING_NAME
+		    , T.ROAD_ADDRESS
+		    , T.OLD_POSTAL_CODE
+		    , T.NEW_POSTAL_CODE
+		    , T.DONG_INFO
+		    , T.FLOOR_INFO
+		    , T.LONGITUDE
+		    , T.LATITUDE
+		    , T.STORE_LIKE
+		    , T.DISTANCE
+		    , T.APPLY_STATUS
+		    , T.FILE_LOCATED
+		FROM
+		    (
+		        SELECT
+		            T1.STORE_ID
+		            , T1.STORE_NAME
+		            , T1.BRANCH_NAME
+		            , T1.MAIN_INDUSTRY_CODE
+		            , T1.MAIN_INDUSTRY_NAME
+		            , T1.MID_INDUSTRY_CODE
+		            , T1.MID_INDUSTRY_NAME
+		            , T1.SUB_INDUSTRY_CODE
+		            , T1.SUB_INDUSTRY_NAME
+		            , T1.STANDARD_INDUSTRY_CODE
+		            , T1.STANDARD_INDUSTRY_NAME
+		            , T1.SIDO_CODE, T1.SIDO_NAME
+		            , T1.SIGUNGU_CODE
+		            , T1.SIGUNGU_NAME
+		            , T1.ADMIN_DONG_CODE
+		            , T1.ADMIN_DONG_NAME
+		            , T1.LEGAL_DONG_CODE
+		            , T1.LEGAL_DONG_NAME
+		            , T1.JIBUN_CODE
+		            , T1.LAND_DIVISION_CODE
+		            , T1.LAND_DIVISION_NAME
+		            , T1.JIBUN_MAIN_NUMBER
+		            , T1.JIBUN_SUB_NUMBER
+		            , T1.JIBUN_ADDRESS
+		            , T1.ROAD_CODE
+		            , T1.ROAD_NAME
+		            , T1.BUILDING_MAIN_NUMBER
+		            , T1.BUILDING_SUB_NUMBER
+		            , T1.BUILDING_MGMT_NUMBER
+		            , T1.BUILDING_NAME
+		            , T1.ROAD_ADDRESS
+		            , T1.OLD_POSTAL_CODE
+		            , T1.NEW_POSTAL_CODE
+		            , T1.DONG_INFO
+		            , T1.FLOOR_INFO
+		            , T1.LONGITUDE
+		            , T1.LATITUDE
+		            , COALESCE(T2.STATUS, 'N') AS STORE_LIKE
+		            ,6371 * ACOS(
+        LEAST(
+            COS(#{lat} * ACOS(-1) / 180) * COS(T1.LATITUDE * ACOS(-1) / 180) *
+            COS((T1.LONGITUDE - #{lon}) * ACOS(-1) / 180) +
+            SIN(#{lat} * ACOS(-1) / 180) * SIN(T1.LATITUDE * ACOS(-1) / 180),
+            1
+        )
+    ) AS DISTANCE
+		            , T3.STATUS AS APPLY_STATUS
+		            , T1.FILE_LOCATED
+		        FROM 
+		            STATS_DATA_STORE_INFO T1
+		        LEFT JOIN 
+		            USER_MY_STORE T2 ON T1.STORE_ID = T2.STORE_INFO_ID AND T2.USER_ID = #{userId}
+		        LEFT JOIN 
+		            ST_BIZ_APPLY T3 ON T1.STORE_ID = T3.APPLY_STORE_ID
+		        WHERE 
+		            T1.LATITUDE IS NOT NULL 
+		            AND T1.LONGITUDE IS NOT NULL
+		            <if test="applyStatus != null and applyStatus != ''">
+		                AND T3.STATUS = #{applyStatus}
+		            </if>
+		            <if test="likeStatus != null and likeStatus != ''">
+		                AND T2.STATUS= #{likeStatus}
+		            </if>
+		            <if test="categoryCode != null and categoryCode != ''">
+		                AND T1.STANDARD_INDUSTRY_CODE = #{categoryCode}
+		            </if>
+		        ORDER BY
+		            DISTANCE
+		        	FETCH FIRST 20 ROWS ONLY
+		    ) T
+		ORDER BY
+		    CASE WHEN T.APPLY_STATUS IS NULL THEN 1 ELSE 0 END,
+		    T.DISTANCE
+	</select>
+	
+	
+	<!-- 가게 관심-->
+	<update id="storeLike" parameterType="hashMap">
+		MERGE INTO USER_MY_STORE target
+		USING (
+		    SELECT 
+		    	#{userId} AS USER_ID,
+		    	#{storeId} AS STORE_INFO_ID,
+		    	#{status} AS STATUS FROM DUAL
+		) source
+		ON (
+			target.USER_ID = source.USER_ID
+			AND target.STORE_INFO_ID = source.STORE_INFO_ID
+			)
+		WHEN MATCHED THEN
+		    <!-- 여기서 source.STATUS N이면 N, Y면 Y -->
+		    UPDATE SET target.STATUS = source.STATUS
+		WHEN NOT MATCHED THEN
+		    INSERT (
+		    	target.USER_ID,
+		    	target.STORE_INFO_ID,
+		    	target.STATUS
+		    )
+		    VALUES (
+		    	source.USER_ID,
+		    	source.STORE_INFO_ID,
+		    	source.STATUS
+		    )
+	</update>
+	
+	<!-- 스탬프 랭크 -->
+	<select id="stampRankList" resultType="hashMap">
+		SELECT 
+		    COUNT(S.STAMP_ID) AS STAMPS,
+		    S.USER_ID,
+		    U.NAME
+		FROM
+		    ST_STAMP S
+		    LEFT JOIN USERS U ON S.USER_ID = U.USER_ID    
+		GROUP BY S.USER_ID, U.NAME
+		ORDER BY STAMPS DESC
+	</select>
+</mapper>

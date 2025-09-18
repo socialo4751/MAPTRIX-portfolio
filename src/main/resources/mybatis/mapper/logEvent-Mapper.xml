@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="kr.or.ddit.common.log.LogEventMapper">
+
+  <!-- LOG_USER_EVENT 스키마: EVENT_ID(PK), USER_ID, EVENT_TYPE, FEATURE, CHANNEL, CLIENT_IP,
+       PARAM_JSON, CONTEXT_JSON, RESULT_ROWS, DURATION_MS, STATUS, RUN_AT -->
+
+  <!-- CLOB 컬럼이면 jdbcType=CLOB, VARCHAR2(4000)이면 jdbcType=VARCHAR 로 맞추세요 -->
+  <insert id="insertLogUserEvent"
+          parameterType="kr.or.ddit.admin.stats.user.vo.LogUserEventVO">
+    INSERT INTO LOG_USER_EVENT (
+      EVENT_ID,
+      USER_ID,
+      EVENT_TYPE,
+      FEATURE,
+      CHANNEL,
+      CLIENT_IP,
+      PARAM_JSON,
+      CONTEXT_JSON,
+      RESULT_ROWS,
+      DURATION_MS,
+      STATUS,
+      RUN_AT
+    ) VALUES (
+      SEQ_LOG_USER_EVENT.NEXTVAL,
+      #{userId,jdbcType=VARCHAR},
+      #{eventType,jdbcType=VARCHAR},
+      #{feature,jdbcType=VARCHAR},
+      #{channel,jdbcType=VARCHAR},
+      #{clientIp,jdbcType=VARCHAR},
+      #{paramJson,jdbcType=CLOB},
+      #{contextJson,jdbcType=CLOB},
+      #{resultRows,jdbcType=NUMERIC},
+      #{durationMs,jdbcType=NUMERIC},
+      #{status,jdbcType=VARCHAR},
+      CASE
+        WHEN #{runAt,jdbcType=TIMESTAMP} IS NULL THEN SYSTIMESTAMP
+        ELSE #{runAt,jdbcType=TIMESTAMP}
+      END
+    )
+  </insert>
+
+</mapper>

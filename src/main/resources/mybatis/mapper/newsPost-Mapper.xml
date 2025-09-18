@@ -1,0 +1,289 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.ddit.community.news.mapper.NewsPostMapper">
+
+	<resultMap id="NewsPostResultMap"
+		type="kr.or.ddit.community.news.vo.CommNewsPostVO">
+		<id property="newsId" column="NEWS_ID" />
+		<result property="adminId" column="ADMIN_ID" />
+		<result property="writerName" column="WRITER_NAME"/>
+		<result property="catCodeId" column="CAT_CODE_ID" />
+
+		<result property="title" column="TITLE" />
+		<result property="content" column="CONTENT" />
+		<result property="press" column="PRESS" />
+		<result property="linkUrl" column="LINK_URL" />
+		<result property="createdAt" column="CREATED_AT" />
+		<result property="updatedAt" column="UPDATED_AT" />
+		<result property="viewCount" column="VIEW_COUNT" />
+		<result property="isDeleted" column="IS_DELETED" />
+		<result property="fileGroupNo" column="FILE_GROUP_NO" />
+		<result property="apiNewsId" column="API_NEWS_ID" />
+		<result property="publishedAt" column="PUBLISHED_AT" />
+		<result property="thumbnailUrl" column="THUMBNAIL_URL" />
+	</resultMap>
+
+
+	<select id="selectTotalNewsCount" parameterType="map"
+		resultType="int">
+		SELECT COUNT(*)
+		FROM COMM_NEWS_POST p
+		WHERE p.IS_DELETED = 'N'
+		<if test="startDate != null and startDate != ''">
+			AND TRUNC(p.CREATED_AT) &gt;= TO_DATE(#{startDate}, 'YYYY-MM-DD')
+		</if>
+		<if test="endDate != null and endDate != ''">
+			AND TRUNC(p.CREATED_AT) &lt;= TO_DATE(#{endDate}, 'YYYY-MM-DD')
+		</if>
+
+		<if test="catCodeId != null and catCodeId != ''">
+			AND p.CAT_CODE_ID = #{catCodeId}
+		</if>
+		<if test="keyword != null and keyword != ''">
+			<choose>
+				<when test="searchType == 'NS101'">
+					AND ( UPPER(p.TITLE)   LIKE '%' || UPPER(#{keyword}) || '%'
+					OR UPPER(p.CONTENT) LIKE '%' || UPPER(#{keyword}) || '%' )
+				</when>
+				<when test="searchType == 'NS102'">
+					AND UPPER(p.TITLE)   LIKE '%' || UPPER(#{keyword}) || '%'
+				</when>
+				<when test="searchType == 'NS103'">
+					AND UPPER(p.CONTENT) LIKE '%' || UPPER(#{keyword}) || '%'
+				</when>
+				<when test="searchType == 'NS104'">
+					AND UPPER(p.PRESS)    LIKE '%' || UPPER(#{keyword}) || '%'
+				</when>
+				<otherwise>
+					AND ( UPPER(p.TITLE)   LIKE '%' || UPPER(#{keyword}) || '%'
+					OR UPPER(p.CONTENT) LIKE '%' || UPPER(#{keyword}) || '%' )
+				</otherwise>
+			</choose>
+		</if>
+	</select>
+	
+	<select id="selectNewsList" parameterType="map" resultMap="NewsPostResultMap">
+    SELECT *
+    FROM (
+        SELECT
+            p.NEWS_ID,
+            p.ADMIN_ID,
+            u.NAME AS WRITER_NAME,
+            p.CAT_CODE_ID,
+            p.TITLE,
+            p.CONTENT,
+            p.PRESS,
+            p.LINK_URL,
+            p.CREATED_AT,
+            p.UPDATED_AT,
+            p.VIEW_COUNT,
+            p.IS_DELETED,
+            p.FILE_GROUP_NO,
+            p.API_NEWS_ID,
+            p.PUBLISHED_AT,
+            p.THUMBNAIL_URL, f.FILE_SAVE_LOCATE,
+            ROW_NUMBER() OVER (ORDER BY p.CREATED_AT DESC, p.NEWS_ID DESC) AS rnum
+        FROM COMM_NEWS_POST p
+        LEFT JOIN USERS u ON p.ADMIN_ID = u.USER_ID
+        LEFT JOIN FILE_DETAIL f ON p.FILE_GROUP_NO = f.FILE_GROUP_NO
+        <where>
+            p.IS_DELETED = 'N'
+            <if test="startDate != null and startDate != ''">
+                AND TRUNC(p.CREATED_AT) &gt;= TO_DATE(#{startDate}, 'YYYY-MM-DD')
+            </if>
+            <if test="endDate != null and endDate != ''">
+                AND TRUNC(p.CREATED_AT) &lt;= TO_DATE(#{endDate}, 'YYYY-MM-DD')
+            </if>
+            <if test="catCodeId != null and catCodeId != ''">
+                AND p.CAT_CODE_ID = #{catCodeId}
+            </if>
+            <if test="keyword != null and keyword != ''">
+                <choose>
+                    <when test="searchType == 'NS101'">
+                        AND ( UPPER(p.TITLE) LIKE '%' || UPPER(#{keyword}) || '%'
+                        OR UPPER(p.CONTENT) LIKE '%' || UPPER(#{keyword}) || '%' )
+                    </when>
+                    <when test="searchType == 'NS102'">
+                        AND UPPER(p.TITLE) LIKE '%' || UPPER(#{keyword}) || '%'
+                    </when>
+                    <when test="searchType == 'NS103'">
+                        AND UPPER(p.CONTENT) LIKE '%' || UPPER(#{keyword}) || '%'
+                    </when>
+                    <when test="searchType == 'NS104'">
+                        AND UPPER(p.PRESS) LIKE '%' || UPPER(#{keyword}) || '%'
+                    </when>
+                    <otherwise>
+                        AND ( UPPER(p.TITLE) LIKE '%' || UPPER(#{keyword}) || '%'
+                        OR UPPER(p.CONTENT) LIKE '%' || UPPER(#{keyword}) || '%' )
+                    </otherwise>
+                </choose>
+            </if>
+        </where>
+    ) a
+    WHERE a.rnum BETWEEN #{startRow} AND #{endRow}
+</select>
+	
+	<select id="selectNewsDetail" parameterType="int" resultMap="NewsPostResultMap">
+    SELECT
+        p.NEWS_ID,
+        p.ADMIN_ID,
+        u.NAME AS WRITER_NAME,
+        p.CAT_CODE_ID,
+        d.CODE_NAME AS CAT_CODE_NAME,
+        p.TITLE,
+        p.CONTENT,
+        p.PRESS,
+        p.LINK_URL,
+        p.CREATED_AT,
+        p.UPDATED_AT,
+        p.VIEW_COUNT,
+        p.IS_DELETED,
+        p.FILE_GROUP_NO,
+        p.API_NEWS_ID,
+        p.PUBLISHED_AT,
+        p.THUMBNAIL_URL, f.FILE_SAVE_LOCATE
+    FROM COMM_NEWS_POST p
+    LEFT JOIN USERS u ON p.ADMIN_ID = u.USER_ID
+    LEFT JOIN CODE_DETAIL d ON d.CODE_GROUP_ID = 'NEWSTAG' AND d.CODE_ID = p.CAT_CODE_ID
+    LEFT JOIN FILE_DETAIL f ON p.FILE_GROUP_NO = f.FILE_GROUP_NO
+    WHERE p.NEWS_ID = #{newsId} AND p.IS_DELETED = 'N'
+</select>
+
+	<update id="incrementViewCount" parameterType="int">
+		UPDATE COMM_NEWS_POST
+		SET VIEW_COUNT = VIEW_COUNT + 1
+		WHERE NEWS_ID = #{newsId}
+	</update>
+
+<insert id="insertNews"
+		parameterType="kr.or.ddit.community.news.vo.CommNewsPostVO">
+		<selectKey keyProperty="newsId" resultType="int"
+			order="BEFORE">
+			SELECT SEQ_COMM_NEWS_POST.NEXTVAL FROM DUAL
+		</selectKey>
+		INSERT INTO COMM_NEWS_POST (
+		NEWS_ID,
+		ADMIN_ID,
+		CAT_CODE_ID,
+		TITLE,
+		CONTENT,
+		VIEW_COUNT,
+		CREATED_AT,
+		IS_DELETED,
+		FILE_GROUP_NO,
+		PRESS,
+		API_NEWS_ID,
+		PUBLISHED_AT,
+		LINK_URL,
+		THUMBNAIL_URL
+        ) VALUES (
+		#{newsId},
+        #{adminId},
+        #{catCodeId},
+        #{title},
+        #{content},
+        NVL(#{viewCount}, 0), 
+        SYSDATE,
+        NVL(#{isDeleted}, 'N'), 
+        NVL(#{fileGroupNo}, 0), 
+        #{press},
+        #{apiNewsId},
+        <if test="publishedAt != null">
+            #{publishedAt}
+        </if>
+        <if test="publishedAt == null">
+            SYSDATE
+        </if>
+        , 
+        #{linkUrl},
+        #{thumbnailUrl}
+    )
+</insert>
+
+
+<insert id="insertNewsWithMap" parameterType="map" useGeneratedKeys="true" keyProperty="newsId">
+    INSERT INTO COMM_NEWS_POST (
+    NEWS_ID,
+    ADMIN_ID,
+    CAT_CODE_ID,
+    TITLE,
+    CONTENT,
+    PRESS,
+    API_NEWS_ID,
+    LINK_URL,
+    PUBLISHED_AT,
+    CREATED_AT,
+    VIEW_COUNT,
+    IS_DELETED,
+    FILE_GROUP_NO
+    ) VALUES (
+    SEQ_COMM_NEWS_POST.NEXTVAL,
+    NVL(#{adminId}, 'admin@test.com'),
+    NVL(#{catCodeId}, 'NEWS001'),
+    #{title},
+    #{content},
+    #{press},
+    #{apiNewsId},
+    #{linkUrl},
+    <choose>
+        <when test="publishedAtFormatted != null and publishedAtFormatted != ''">
+            TO_DATE(#{publishedAtFormatted}, 'YYYY-MM-DD')
+        </when>
+        <otherwise>
+            SYSDATE
+        </otherwise>
+    </choose> ,
+    SYSDATE,
+    NVL(#{viewCount}, 0),
+    NVL(#{isDeleted}, 'N'),
+    NVL(#{fileGroupNo}, 0)
+    )
+    <selectKey keyProperty="newsId" resultType="int" order="AFTER">
+        SELECT SEQ_COMM_NEWS_POST.CURRVAL FROM DUAL
+    </selectKey>
+</insert>
+	<insert id="insertNewsTag" parameterType="map">
+		INSERT INTO NEWS_TAG (
+		TAG_ID,
+		NEWS_ID,
+		TAG_NAME
+		) VALUES (
+		NEWS_TAG_SEQ.NEXTVAL, #{newsId}, #{tagName} )
+	</insert>
+
+	<update id="updateNews" parameterType="kr.or.ddit.community.news.vo.CommNewsPostVO">
+    UPDATE COMM_NEWS_POST
+    SET
+        TITLE = #{title},
+        CONTENT = #{content},
+        PRESS = #{press},
+        LINK_URL = #{linkUrl},
+        UPDATED_AT = SYSDATE,
+        API_NEWS_ID = #{apiNewsId},
+        PUBLISHED_AT = #{publishedAt},
+        THUMBNAIL_URL = #{thumbnailUrl}, FILE_GROUP_NO = #{fileGroupNo}
+    WHERE NEWS_ID = #{newsId}
+</update>
+
+	<update id="disconnectFileFromNews" parameterType="int">
+    UPDATE COMM_NEWS_POST
+    SET FILE_GROUP_NO = 0
+    WHERE NEWS_ID = #{newsId}
+</update>
+
+
+	<update id="deleteNews" parameterType="int">
+		UPDATE COMM_NEWS_POST
+		SET IS_DELETED = 'Y',
+		UPDATED_AT = SYSDATE WHERE NEWS_ID = #{newsId}
+	</update>
+
+<select id="selectNewsById" parameterType="int" resultMap="NewsPostResultMap">
+    SELECT
+        NEWS_ID, ADMIN_ID, CAT_CODE_ID, TITLE, CONTENT, PRESS,
+        LINK_URL, CREATED_AT, UPDATED_AT, VIEW_COUNT, IS_DELETED,
+        FILE_GROUP_NO, API_NEWS_ID, PUBLISHED_AT,
+        THUMBNAIL_URL FROM COMM_NEWS_POST
+    WHERE NEWS_ID = #{newsId} AND IS_DELETED = 'N'
+</select>
+</mapper>

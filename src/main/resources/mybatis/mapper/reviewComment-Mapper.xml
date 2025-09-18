@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+ "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!-- ReviewCommentMapper 인터페이스와 매핑되는 XML 파일입니다. -->
+<mapper namespace="kr.or.ddit.community.review.mapper.ReviewCommentMapper">
+
+    <!-- CommReviewCommentVO와 데이터베이스 컬럼을 매핑하는 resultMap -->
+    <resultMap id="ReviewCommentResultMap" type="kr.or.ddit.community.review.vo.CommReviewCommentVO">
+        <id     property="commentId"    column="COMMENT_ID"/>
+        <result property="postId"       column="POST_ID"/>
+        <result property="userId"       column="USER_ID"/>
+        <result property="writerName"   column="WRITER_NAME"/> <!-- USERS 테이블에서 가져올 필드 -->
+        <result property="content"      column="CONTENT"/>
+        <result property="createdAt"    column="CREATED_AT"/>
+        <result property="updatedAt"    column="UPDATED_AT"/>
+        <result property="parentId"     column="PARENT_ID"/>
+        <result property="depth"        column="DEPTH"/>
+        <result property="isDeleted"    column="IS_DELETED"/>
+    </resultMap>
+
+    <!-- 새로운 댓글을 삽입하는 SQL -->
+    <insert id="insertComment" parameterType="kr.or.ddit.community.review.vo.CommReviewCommentVO">
+        <selectKey keyProperty="commentId" resultType="int" order="BEFORE">
+            <!-- Oracle 시퀀스를 사용하여 COMMENT_ID 자동 생성 (ERD에 따라 시퀀스명 확인 필요) -->
+            SELECT SEQ_COMM_REVIEW_COMMENT.NEXTVAL FROM DUAL
+        
+        </selectKey>
+        INSERT INTO COMM_REVIEW_COMMENT (
+            COMMENT_ID, POST_ID, USER_ID, CONTENT, CREATED_AT, PARENT_ID, DEPTH, IS_DELETED
+        ) VALUES (
+            #{commentId}, #{postId}, #{userId}, #{content}, SYSDATE, #{parentId}, #{depth}, 'N'
+        )
+    </insert>
+
+    <!-- 특정 게시글 ID에 속한 모든 댓글 목록을 조회하는 SQL -->
+    <!-- 계층형 댓글을 위해 ORDER BY 절에 DEPTH와 COMMENT_ID를 포함합니다. -->
+    <select id="selectCommentsByPostId" parameterType="int" resultMap="ReviewCommentResultMap">
+        SELECT
+            c.COMMENT_ID, c.POST_ID, c.USER_ID, c.CONTENT, c.CREATED_AT, c.UPDATED_AT,
+            c.PARENT_ID, c.DEPTH, c.IS_DELETED,
+            u.NAME AS WRITER_NAME
+        FROM COMM_REVIEW_COMMENT c
+                 JOIN USERS u ON c.USER_ID = u.USER_ID
+        WHERE c.POST_ID = #{postId} AND c.IS_DELETED = 'N'
+        ORDER BY c.PARENT_ID ASC NULLS FIRST, c.CREATED_AT ASC, c.COMMENT_ID ASC
+        <!-- PARENT_ID가 NULL인 댓글이 먼저 오고, 같은 PARENT_ID 내에서는 작성일시 순으로 정렬 -->
+    </select>
+
+    <!-- 특정 댓글 ID로 댓글 정보를 조회하는 SQL (depth 계산 등을 위해 사용) -->
+    <select id="selectCommentById" parameterType="int" resultMap="ReviewCommentResultMap">
+        SELECT
+            c.COMMENT_ID, c.POST_ID, c.USER_ID, c.CONTENT, c.CREATED_AT, c.UPDATED_AT,
+            c.PARENT_ID, c.DEPTH, c.IS_DELETED,
+            u.NAME AS WRITER_NAME
+        FROM COMM_REVIEW_COMMENT c
+                 JOIN USERS u ON c.USER_ID = u.USER_ID
+        WHERE c.COMMENT_ID = #{commentId} AND c.IS_DELETED = 'N'
+    </select>
+
+    <!-- 댓글 정보를 업데이트하는 SQL -->
+    <update id="updateComment" parameterType="kr.or.ddit.community.review.vo.CommReviewCommentVO">
+        UPDATE COMM_REVIEW_COMMENT
+        SET
+            CONTENT = #{content},
+            UPDATED_AT = SYSDATE
+        WHERE COMMENT_ID = #{commentId} AND IS_DELETED = 'N'
+        <!-- USER_ID 조건은 서비스 계층에서 권한 확인 후 업데이트 하므로 여기서는 제외하거나 추가 가능 -->
+        <!-- AND USER_ID = #{userId} -->
+    </update>
+
+    <!-- 특정 댓글을 논리적으로 삭제하는 SQL (IS_DELETED 컬럼을 'Y'로 업데이트) -->
+    <update id="deleteCommentsByPostId" parameterType="int">
+        UPDATE COMM_REVIEW_COMMENT
+        SET
+            IS_DELETED = 'Y',
+            UPDATED_AT = SYSDATE
+        WHERE COMMENT_ID = #{commentId}
+    </update>
+
+    <!-- 추가: 특정 부모 댓글 ID를 가진 자식 댓글이 있는지 확인하는 SQL (필요시 사용) -->
+    <!--
+    <select id="hasChildComments" parameterType="int" resultType="boolean">
+        SELECT COUNT(*) > 0
+        FROM COMM_REVIEW_COMMENT
+        WHERE PARENT_ID = #{parentId} AND IS_DELETED = 'N'
+    </select>
+    -->
+    <select id="countCommentsByUserId" parameterType="string" resultType="int">
+	    SELECT COUNT(*)
+	    FROM COMM_REVIEW_COMMENT
+	    WHERE USER_ID = #{userId} AND IS_DELETED = 'N'
+	</select>
+	
+	<select id="selectCommentsByUserId" parameterType="string" resultType="kr.or.ddit.community.review.vo.CommReviewCommentVO">
+	    SELECT
+	        '댓글' AS ACTIVITY_TYPE,
+	        POST_ID, CONTENT, CREATED_AT
+	    FROM COMM_REVIEW_COMMENT
+	    WHERE USER_ID = #{userId} AND IS_DELETED = 'N'
+	    ORDER BY CREATED_AT DESC
+	</select>
+</mapper>

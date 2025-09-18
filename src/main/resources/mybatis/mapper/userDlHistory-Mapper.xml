@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.ddit.user.my.dlhistory.mapper.UserDlHistoryMapper">
+
+    <resultMap type="kr.or.ddit.user.my.dlhistory.vo.UserDlHistoryVO" id="userDlHistoryMap">
+        <id property="historyId" column="HISTORY_ID" />
+        <result property="userId" column="USER_ID" />
+        <result property="historyType" column="HISTORY_TYPE" />
+        <result property="historyTitle" column="HISTORY_TITLE" />
+        <result property="analysisParams" column="ANALYSIS_PARAMS" />
+        <result property="createdAt" column="CREATED_AT" />
+        <result property="fileGroupNo" column="FILE_GROUP_NO" />
+    </resultMap>
+
+    <insert id="insertHistory" parameterType="kr.or.ddit.user.my.dlhistory.vo.UserDlHistoryVO">
+        <selectKey keyProperty="historyId" resultType="long" order="BEFORE">
+            SELECT SEQ_USER_DL_HISTORY_ID.NEXTVAL FROM DUAL
+        </selectKey>
+        INSERT INTO USER_DL_HISTORY (
+            HISTORY_ID, USER_ID, FILE_GROUP_NO, HISTORY_TYPE, HISTORY_TITLE, ANALYSIS_PARAMS, CREATED_AT
+        ) VALUES (
+            #{historyId}, #{userId}, #{fileGroupNo}, #{historyType}, #{historyTitle}, #{analysisParams, jdbcType=CLOB}, SYSDATE
+        )
+    </insert>
+
+    <select id="selectTotalCountByUserId" parameterType="map" resultType="int">
+        SELECT
+            COUNT(*)
+        FROM
+            USER_DL_HISTORY
+        <where>
+            USER_ID = #{userId}
+            <if test="keyword != null and keyword != ''">
+                AND HISTORY_TITLE LIKE '%' || #{keyword} || '%'
+            </if>
+            <if test="filterType != null and filterType != ''">
+                <choose>
+                    <when test="filterType == 'simple'">
+                        AND HISTORY_TYPE = 'SIMPLE_PDF'
+                    </when>
+                    <when test="filterType == 'detail'">
+                        AND (HISTORY_TYPE = 'DETAIL_PDF' OR HISTORY_TYPE LIKE 'AI_%')
+                    </when>
+                    <when test="filterType == 'excel'">
+                        AND HISTORY_TYPE = 'INDICATOR_EXCEL'
+                    </when>
+                </choose>
+            </if>
+        </where>
+    </select>
+
+    <select id="selectHistoryListByUserId" parameterType="map" resultMap="userDlHistoryMap">
+        SELECT
+            B.*
+        FROM (
+            SELECT
+                ROWNUM AS RNUM,
+                A.*
+            FROM (
+                SELECT
+                    HISTORY_ID, USER_ID, FILE_GROUP_NO, HISTORY_TYPE, HISTORY_TITLE, ANALYSIS_PARAMS, CREATED_AT
+                FROM
+                    USER_DL_HISTORY
+                <where>
+                    USER_ID = #{userId}
+                    <if test="keyword != null and keyword != ''">
+                        AND HISTORY_TITLE LIKE '%' || #{keyword} || '%'
+                    </if>
+                    <if test="filterType != null and filterType != ''">
+                        <choose>
+                            <when test="filterType == 'simple'">
+                                AND HISTORY_TYPE = 'SIMPLE_PDF'
+                            </when>
+                            <when test="filterType == 'detail'">
+                                AND (HISTORY_TYPE = 'DETAIL_PDF' OR HISTORY_TYPE LIKE 'AI_%')
+                            </when>
+                            <when test="filterType == 'excel'">
+                                AND HISTORY_TYPE = 'INDICATOR_EXCEL'
+                            </when>
+                        </choose>
+                    </if>
+                </where>
+                ORDER BY
+                    CREATED_AT DESC
+            ) A
+        ) B
+        WHERE
+            B.RNUM BETWEEN #{startRow} AND #{endRow}
+    </select>
+    
+    <select id="getHistoryByFileGroupNo" parameterType="long" resultMap="userDlHistoryMap">
+        SELECT
+	        HISTORY_ID, USER_ID, FILE_GROUP_NO, HISTORY_TYPE, HISTORY_TITLE, ANALYSIS_PARAMS, CREATED_AT
+	    FROM
+	        USER_DL_HISTORY
+	    WHERE
+	        FILE_GROUP_NO = #{fileGroupNo}
+    </select>
+    
+    <select id="getHistoryById" parameterType="long" resultMap="userDlHistoryMap">
+        SELECT
+            HISTORY_ID, USER_ID, HISTORY_TYPE, HISTORY_TITLE, ANALYSIS_PARAMS, CREATED_AT, FILE_GROUP_NO
+        FROM 
+        	USER_DL_HISTORY
+        WHERE 
+        	HISTORY_ID = #{historyId}
+    </select>
+
+</mapper>

@@ -1,0 +1,205 @@
+@charset "utf-8";
+
+/* @import url(/fonts/pretendard/fonts.css); */
+/* @import url(/fonts/TTTtangsbudaejjigaeB/fonts.css); */
+
+/** 기존 **/
+/* ========== reset ========== */
+a, abbr, acronym, address, applet, article, aside, audio,
+b, blockquote, big, body,
+center, canvas, caption, cite, code, command,
+datalist, dd, del, details, dfn, dl, div, dt,
+em, embed,
+fieldset, figcaption, figure, footer, form,
+h1, h2, h3, h4, h5, h6, header, hgroup, html,
+i, iframe, img, ins, input,
+kbd,
+keygen,
+label, legend, li,
+meter, mark,
+nav, menu,
+object, ol, output, option,
+p, pre, progress,
+q,
+s, samp, section, small, span, source, strike, sub, sup,
+u, ul,
+var{padding:0;margin:0;font-size:100%;font:inherit;border:0;box-sizing:border-box;}
+/* body{line-height:1;} */
+ul, ol, li{list-style:none;}
+table{border-collapse:collapse;border-spacing:0;}
+caption, legend{position:relative; left:-10000px; top:auto; width:1px; height:1px; overflow:hidden;}
+td, th{word-break:break-all;vertical-align:middle;}
+mark, var{background:none;}
+img, input, button, select, textarea{vertical-align:middle;}
+img, fieldset, iframe{border:0;}
+
+/* html5 - for older browsers */
+article, aside, details, figcaption, figure,
+footer, header, hgroup, menu, nav, section{display:block;}
+
+table caption
+{position:relative;
+left:-10000px;
+top:auto;
+width:1px;
+height:0px;
+overflow:hidden;}
+
+@font-face {
+   font-family: 'NanumBarunGothic';
+   font-style: normal;
+   src: url(/font/NanumBarunGothic.eot);
+   src: url(/font/layout/NanumBarunGothic.woff) format('woff');
+}
+
+/* body */
+/* body {
+   -webkit-text-size-adjust: none;
+   font-family: 'Pretendard','NanumBarunGothic', '나눔바른고딕', Malgun gothic, '맑은고딕', Dotum, '돋움', arial, sans-serif;
+   color: #666;
+} */
+/* scroll style */
+html {
+   overflow: auto;
+   overflow-y: scroll;
+}
+/* anchor */
+a:hover, a:focus, a:active, a:link, a:visited {
+   /* color: #666; */
+   text-decoration: none;
+}
+button {
+   cursor: pointer;
+}
+/* skipNavigation */
+.skiptoContent {
+   position: absolute;
+   margin: 0 auto;
+   z-index: 99999;
+   top: 0;
+   left: 0;
+   right: 0;
+}
+.skiptoContent a {
+   position: absolute;
+   width: 100%;
+   font-size: 0;
+   top: -50px;
+}
+.skiptoContent a:active, .skiptoContent a:focus {
+   display: block;
+   font-size: 12px;
+   padding: 10px;
+   top: 0;
+   text-align: center;
+   color: #fff;
+   font-weight: 600;
+   background: #000;
+   outline: 0;
+}
+/* scroll */
+.noScroll, .noScroll body {
+   overflow: hidden !important;
+   height: 100%;
+}
+
+
+/* box behavior */
+.fl {
+   float: left !important;
+}
+.fr {
+   float: right !important;
+}
+.cb {
+   clear: both !important;
+}
+.hide {
+   display: none !important;
+}
+.hidden {
+   position: absolute;
+   top: -9999px;
+   left: -9999px;
+   font-size: 0;
+   width: 0;
+   height: 0;
+   line-height: 0;
+   background: none;
+}
+/* sizing */
+.mt0 {
+   margin-top: 0 !important;
+}
+.mtXs {
+   margin-top: 12px !important;
+}
+.mtS {
+   margin-top: 22px !important;
+}
+.mtXl {
+   margin-top: 50px !important;
+}
+/* responsible */
+.forPc {
+   display: block !important;
+}
+.forTab, .faoMbl, .hidePc {
+   display: none !important;
+}
+@media screen and (max-width:1000px) {
+.forPc {
+   display: none !important;
+}
+.forTab,  .hidePc {
+   display: block !important;
+}
+}
+@media screen and (max-width:900px) {
+.btnPrevSlide, .btnNextSlide {
+   display: block;
+}
+}
+@media screen and (max-width:480px) {
+.forTab {
+   display: none !important;
+}
+.forMbl {
+   display: block !important;
+}
+}
+/* text */
+.vt {
+   vertical-align: top !important;
+}
+.vm {
+   vertical-align: middle !important;
+}
+.al {
+   text-align: left !important;
+}
+.ac {
+   text-align: center !important;
+}
+.ar {
+   text-align: right !important;
+}
+.aj {
+   text-align: justify;
+}
+.tl {
+   text-decoration: line-through;
+}
+.tu {/* text-decoration:underline;*/
+   border-width: 0 0 1px 0;
+   border-style: solid;
+}
+.fn {
+   font-weight: 500;
+}
+.fb {
+   font-weight: 600 !important;
+}
+.ls {
+   letter-spacing: -1px;
+}

@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.ddit.admin.openapi.mapper.AdminApiServiceMapper">
+
+    <sql id="searchCondition">
+        <where>
+            <if test="keyword != null and keyword != ''">
+                AND SVC.API_NAME_KR LIKE '%' || #{keyword} || '%'
+            </if>
+            <if test="catCodeId != null and catCodeId != ''">
+                AND SVC.API_CATEGORY = #{catCodeId}
+            </if>
+        </where>
+    </sql>
+
+    <select id="selectApiServiceCount" parameterType="map" resultType="int">
+        SELECT COUNT(SVC.API_ID) 
+        FROM API_SERVICE SVC
+        <include refid="searchCondition" />
+    </select>
+
+    <select id="selectApiServiceList" parameterType="map" resultType="kr.or.ddit.common.vo.openapi.ApiServiceVO">
+        SELECT B.*
+        FROM (
+            SELECT ROWNUM AS RNUM, A.*
+            FROM (
+                SELECT
+                    SVC.API_ID, 
+                    CATE.CODE_NAME AS apiCategory,  -- 카테고리 이름
+                    TYPE.CODE_NAME AS serviceType,   -- 서비스 타입 이름
+                    SVC.API_NAME_KR, 
+                    SVC.API_DESC, 
+                    SVC.SUPPORTED_FORMATS,
+                    SVC.SUBSCRIPTION_PERIOD_MONTHS
+                FROM 
+                    API_SERVICE SVC
+                LEFT JOIN 
+                    CODE_DETAIL CATE ON SVC.API_CATEGORY = CATE.CODE_ID
+                LEFT JOIN
+                    CODE_DETAIL TYPE ON SVC.SERVICE_TYPE = TYPE.CODE_ID
+                <include refid="searchCondition" />
+                ORDER BY SVC.API_ID DESC
+            ) A
+        ) B
+        WHERE B.RNUM BETWEEN #{firstRecord} AND #{lastRecord}
+    </select>
+    
+    <select id="selectApiServiceById" parameterType="long" resultType="kr.or.ddit.common.vo.openapi.ApiServiceVO">
+        SELECT * FROM API_SERVICE WHERE API_ID = #{apiId}
+    </select>
+
+    <insert id="insertApiService" parameterType="kr.or.ddit.common.vo.openapi.ApiServiceVO">
+        INSERT INTO API_SERVICE (
+            API_ID, API_CATEGORY, API_NAME_KR, API_DESC, SUPPORTED_FORMATS, 
+            DATA_SOURCE_INFO, SERVICE_TYPE, DAILY_CALL_LIMIT, BASE_URL, 
+            SWAGGER_URL, REQUEST_PARAMS_DESC, SAMPLE_CODE, API_CAUTIONS,SUBSCRIPTION_PERIOD_MONTHS, REQUEST_ENDPOINT, REQUEST_EXAMPLE, RESPONSE_EXAMPLE
+        ) VALUES (
+            SEQ_API_SERVICE_ID.NEXTVAL, #{apiCategory}, #{apiNameKr}, #{apiDesc}, #{supportedFormats},
+            #{dataSourceInfo}, #{serviceType}, #{dailyCallLimit}, #{baseUrl},
+            #{swaggerUrl}, #{requestParamsDesc}, #{sampleCode}, #{apiCautions}, #{subscriptionPeriodMonths},#{requestEndpoint},#{requestExample}, #{responseExample}
+        )
+    </insert>
+
+    <update id="updateApiService" parameterType="kr.or.ddit.common.vo.openapi.ApiServiceVO">
+        UPDATE API_SERVICE
+        SET
+            API_CATEGORY = #{apiCategory},
+            API_NAME_KR = #{apiNameKr},
+            API_DESC = #{apiDesc},
+            SUPPORTED_FORMATS = #{supportedFormats},
+            DATA_SOURCE_INFO = #{dataSourceInfo},
+            SERVICE_TYPE = #{serviceType},
+            DAILY_CALL_LIMIT = #{dailyCallLimit},
+            BASE_URL = #{baseUrl},
+            SWAGGER_URL = #{swaggerUrl},
+            REQUEST_PARAMS_DESC = #{requestParamsDesc},
+            SAMPLE_CODE = #{sampleCode},
+            API_CAUTIONS = #{apiCautions},
+            REQUEST_ENDPOINT = #{requestEndpoint},
+            REQUEST_EXAMPLE = #{requestExample},
+        	RESPONSE_EXAMPLE = #{responseExample},
+        	SUBSCRIPTION_PERIOD_MONTHS = #{subscriptionPeriodMonths}
+        WHERE
+            API_ID = #{apiId}
+    </update>
+
+</mapper>

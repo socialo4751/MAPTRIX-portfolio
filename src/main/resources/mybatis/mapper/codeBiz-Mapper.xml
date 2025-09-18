@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="kr.or.ddit.community.free.mapper.CodeBizMapper">
+
+	<select id="selectMainCategories" resultType="kr.or.ddit.common.vo.code.CodeBizVO">
+        SELECT
+            BIZ_CODE_ID, BIZ_NAME, BIZ_LEVEL, PARENT_CODE_ID
+        FROM
+            CODE_BIZ
+        WHERE
+            PARENT_CODE_ID IS NULL
+        ORDER BY
+            BIZ_NAME
+    </select>
+
+    <select id="selectSubCategoriesByParentCode" parameterType="string" resultType="kr.or.ddit.common.vo.code.CodeBizVO">
+        SELECT
+            BIZ_CODE_ID, BIZ_NAME, BIZ_LEVEL, PARENT_CODE_ID
+        FROM
+            CODE_BIZ
+        WHERE
+            PARENT_CODE_ID = #{parentCodeId}
+        ORDER BY
+            BIZ_NAME
+    </select>
+
+    <select id="selectBizInfoByCode" parameterType="string" resultType="kr.or.ddit.common.vo.code.CodeBizVO">
+        SELECT
+            BIZ_CODE_ID, BIZ_NAME, BIZ_LEVEL, PARENT_CODE_ID
+        FROM
+            CODE_BIZ
+        WHERE
+            BIZ_CODE_ID = #{bizCodeId}
+    </select>
+
+</mapper>

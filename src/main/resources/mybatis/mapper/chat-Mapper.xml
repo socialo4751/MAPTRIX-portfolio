@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+ "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="kr.or.ddit.community.free.mapper.ChatMapper">
+
+  <resultMap id="ChatRoomMap" type="kr.or.ddit.community.free.vo.ChatRoomsVO">
+    <id     property="roomId"    column="ROOM_ID"/>
+    <result property="bizCodeId" column="BIZ_CODE_ID"/>
+    <result property="roomName"  column="ROOM_NAME"/>
+    <result property="createdAt" column="CREATED_AT"/>
+    <result property="capacity"  column="CAPACITY"/>
+  </resultMap>
+
+  <resultMap id="ChatMessageMap" type="kr.or.ddit.community.free.vo.ChatMessagesVO">
+    <id     property="msgId"   column="MSG_ID"/>
+    <result property="roomId"  column="ROOM_ID"/>
+    <result property="senderId" column="SENDER_ID"/>
+    <result property="content" column="CONTENT"/>
+    <result property="sentAt"  column="SENT_AT"/>
+    <result property="senderNickname" column="SENDER_NICKNAME"/>
+  </resultMap>
+
+  <insert id="insertRoom" parameterType="kr.or.ddit.community.free.vo.ChatRoomsVO">
+    <selectKey keyProperty="roomId" resultType="int" order="BEFORE">
+      SELECT SEQ_CHAT_ROOMS_ID.NEXTVAL FROM DUAL
+    </selectKey>
+    INSERT INTO CHAT_ROOMS (
+      ROOM_ID, BIZ_CODE_ID, ROOM_NAME, CREATED_AT, CAPACITY
+    ) VALUES (
+      #{roomId},
+      #{bizCodeId},
+      #{roomName},
+      SYSTIMESTAMP,
+      #{capacity}
+    )
+  </insert>
+
+  <select id="selectRoomByBizCode"
+          parameterType="string"
+          resultMap="ChatRoomMap">
+    SELECT ROOM_ID, BIZ_CODE_ID, ROOM_NAME, CREATED_AT, CAPACITY
+    FROM CHAT_ROOMS
+    WHERE BIZ_CODE_ID = #{bizCodeId}
+  </select>
+
+  <insert id="insertMessage" parameterType="kr.or.ddit.community.free.vo.ChatMessagesVO">
+    <selectKey keyProperty="msgId" resultType="int" order="BEFORE">
+      SELECT SEQ_CHAT_MESSAGES_ID.NEXTVAL FROM DUAL
+    </selectKey>
+    INSERT INTO CHAT_MESSAGES (
+      MSG_ID, ROOM_ID, SENDER_ID, CONTENT, SENT_AT
+    ) VALUES (
+      #{msgId},
+      #{roomId},
+      #{senderId},
+      #{content},
+      SYSTIMESTAMP
+    )
+  </insert>
+
+  <select id="selectMessagesByRoomId"
+          parameterType="int"
+          resultMap="ChatMessageMap">
+    SELECT
+        m.MSG_ID,
+        m.ROOM_ID,
+        m.SENDER_ID,
+        m.CONTENT,
+        m.SENT_AT,
+        vn.VIRTUAL_NICKNAME AS senderNickname
+    FROM
+        CHAT_MESSAGES m
+    LEFT JOIN
+        VIRTUAL_NICKNAMES vn ON (m.SENDER_ID = vn.USER_ID AND m.ROOM_ID = vn.ROOM_ID)
+    WHERE
+        m.ROOM_ID = #{roomId}
+    ORDER BY
+        m.SENT_AT ASC
+  </select>
+
+</mapper>

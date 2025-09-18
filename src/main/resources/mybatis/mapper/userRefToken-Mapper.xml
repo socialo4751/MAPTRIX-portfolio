@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.ddit.user.signin.mapper.UsersRefTokenMapper">
+
+	<resultMap id="RefreshTokenResult"
+		type="kr.or.ddit.user.signin.vo.UsersRefTokenVO">
+		<id property="tokenId" column="TOKEN_ID" />
+		<result property="userId" column="USER_ID" />
+		<result property="expiresAt" column="EXPIRES_AT" />
+	</resultMap>
+
+	<update id="insert"
+		parameterType="kr.or.ddit.user.signin.vo.UsersRefTokenVO">
+		MERGE INTO USERS_REF_TOKEN T
+		USING (
+		SELECT #{userId} AS USER_ID FROM DUAL
+		) S
+		ON (T.USER_ID = S.USER_ID)
+		WHEN MATCHED THEN
+
+		UPDATE SET
+		TOKEN_ID = #{tokenId},
+		EXPIRES_AT = #{expiresAt}
+		WHEN NOT MATCHED THEN
+
+		INSERT (TOKEN_ID, USER_ID, EXPIRES_AT)
+		VALUES (#{tokenId}, #{userId}, #{expiresAt})
+	</update>
+
+	<select id="findByToken" resultMap="RefreshTokenResult"
+		parameterType="String">
+		SELECT TOKEN_ID, USER_ID, EXPIRES_AT FROM USERS_REF_TOKEN
+		WHERE TOKEN_ID = #{tokenId}
+	</select>
+
+	<delete id="deleteByToken" parameterType="String">
+		DELETE FROM USERS_REF_TOKEN
+		WHERE TOKEN_ID = #{tokenId}
+	</delete>
+
+	<delete id="deleteByUserId" parameterType="String">
+		DELETE FROM USERS_REF_TOKEN
+		WHERE USER_ID = #{userId}
+	</delete>
+
+</mapper>

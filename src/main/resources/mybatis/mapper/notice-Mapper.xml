@@ -1,0 +1,240 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.ddit.cs.notice.mapper.CsNoticePostMapper">
+
+    <resultMap id="NoticePostResultMap" type="kr.or.ddit.cs.notice.vo.CsNoticePostVO">
+        <id property="postId" column="POST_ID"/>
+        <result property="adminId" column="ADMIN_ID"/>
+        <result property="writerName" column="WRITER_NAME"/>
+        <result property="catCodeId" column="CAT_CODE_ID"/>
+        <result property="catCodeName" column="CAT_CODE_NAME"/>
+        <result property="title" column="TITLE"/>
+        <result property="content" column="CONTENT"/>
+        <result property="viewCount" column="VIEW_COUNT"/>
+        <result property="createdAt" column="CREATED_AT"/>
+        <result property="updatedAt" column="UPDATED_AT"/>
+        <result property="fileGroupNo" column="FILE_GROUP_NO"/>
+        <result property="delYn" column="DEL_YN"/>
+    </resultMap>
+
+    <!-- 1) 전체 공지 조회 (삭제글 제외) -->
+    <select id="selectAllNotices" resultMap="NoticePostResultMap">
+        SELECT p.POST_ID,
+               p.ADMIN_ID,
+               p.CAT_CODE_ID,
+               d.CODE_NAME AS CAT_CODE_NAME,
+               p.TITLE,
+               p.CONTENT,
+               p.VIEW_COUNT,
+               p.CREATED_AT,
+               p.UPDATED_AT,
+               p.FILE_GROUP_NO,
+               p.DEL_YN,
+               u.NAME      AS WRITER_NAME
+        FROM CS_NOTICE_POST p
+                 JOIN USERS u ON p.ADMIN_ID = u.USER_ID
+                 LEFT JOIN CODE_DETAIL d
+                           ON d.CODE_GROUP_ID = 'NOTICETAG'
+                               AND d.CODE_ID = p.CAT_CODE_ID
+        WHERE p.DEL_YN = 'N'
+        ORDER BY p.CREATED_AT DESC
+    </select>
+
+    <!-- 2) 단일 공지 조회 (삭제글 제외) -->
+    <select id="selectNoticeById" parameterType="int" resultMap="NoticePostResultMap">
+        SELECT p.POST_ID,
+               p.ADMIN_ID,
+               p.CAT_CODE_ID,
+               d.CODE_NAME AS CAT_CODE_NAME,
+               p.TITLE,
+               p.CONTENT,
+               p.VIEW_COUNT,
+               p.CREATED_AT,
+               p.UPDATED_AT,
+               p.FILE_GROUP_NO,
+               p.DEL_YN,
+               u.NAME      AS WRITER_NAME
+        FROM CS_NOTICE_POST p
+                 JOIN USERS u ON p.ADMIN_ID = u.USER_ID
+                 LEFT JOIN CODE_DETAIL d
+                           ON d.CODE_GROUP_ID = 'NOTICETAG'
+                               AND d.CODE_ID = p.CAT_CODE_ID
+        WHERE p.POST_ID = #{postId}
+          AND p.DEL_YN = 'N'
+    </select>
+
+    <!-- 3) 공지 등록 -->
+    <insert id="insertNotice" parameterType="kr.or.ddit.cs.notice.vo.CsNoticePostVO">
+        <selectKey keyProperty="postId" resultType="int" order="BEFORE">
+            SELECT SEQ_CS_NOTICE_POST_ID.NEXTVAL FROM DUAL
+        </selectKey>
+        INSERT INTO CS_NOTICE_POST
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            POST_ID,
+            ADMIN_ID,
+            CAT_CODE_ID,
+            TITLE,
+            CONTENT,
+            VIEW_COUNT,
+            CREATED_AT
+            <if test="fileGroupNo > 0">, FILE_GROUP_NO</if>
+        </trim>
+        <trim prefix="VALUES (" suffix=")" suffixOverrides=",">
+            #{postId},
+            #{adminId},
+            #{catCodeId},
+            #{title},
+            #{content},
+            0,
+            SYSDATE
+            <if test="fileGroupNo > 0">, #{fileGroupNo}</if>
+        </trim>
+    </insert>
+
+    <!-- 4) 공지 수정 (삭제된 글 수정 방지) -->
+    <update id="updateNotice" parameterType="kr.or.ddit.cs.notice.vo.CsNoticePostVO">
+        UPDATE CS_NOTICE_POST
+        <set>
+            <if test="catCodeId != null">CAT_CODE_ID = #{catCodeId},</if>
+            <if test="title      != null">TITLE = #{title},</if>
+            <if test="content    != null">CONTENT = #{content},</if>
+            UPDATED_AT = SYSDATE
+            <if test="fileGroupNo != null and fileGroupNo > 0">
+                , FILE_GROUP_NO = #{fileGroupNo}
+            </if>
+        </set>
+        WHERE POST_ID = #{postId}
+        AND DEL_YN = 'N'
+    </update>
+
+    <!-- 5) 조회수 증가 (삭제된 글 제외) -->
+    <update id="incrementViewCount" parameterType="int">
+        UPDATE CS_NOTICE_POST
+        SET VIEW_COUNT = VIEW_COUNT + 1
+        WHERE POST_ID = #{postId}
+          AND DEL_YN = 'N'
+    </update>
+
+    <!-- 6) 페이징용 전체 건수 조회 (삭제글 제외) -->
+    <select id="selectNoticeCount" parameterType="hashMap" resultType="int">
+        SELECT COUNT(*)
+        FROM CS_NOTICE_POST p
+        JOIN USERS u ON p.ADMIN_ID = u.USER_ID
+        <where>
+            AND p.DEL_YN = 'N'
+            <if test="catCodeId != null and catCodeId != ''">
+                AND p.CAT_CODE_ID = #{catCodeId}
+            </if>
+            <if test="keyword != null and keyword != ''">
+                <choose>
+                    <when test="searchType == 'SC101'">
+                        AND ( UPPER(p.TITLE) LIKE '%' || UPPER(#{keyword}) || '%'
+                        OR UPPER(p.CONTENT) LIKE '%' || UPPER(#{keyword}) || '%' )
+                    </when>
+                    <when test="searchType == 'SC102'">
+                        AND UPPER(p.TITLE) LIKE '%' || UPPER(#{keyword}) || '%'
+                    </when>
+                    <when test="searchType == 'SC103'">
+                        AND UPPER(p.CONTENT) LIKE '%' || UPPER(#{keyword}) || '%'
+                    </when>
+                    <when test="searchType == 'SC104'">
+                        AND UPPER(u.NAME) LIKE '%' || UPPER(#{keyword}) || '%'
+                    </when>
+                    <otherwise>
+                        AND ( UPPER(p.TITLE) LIKE '%' || UPPER(#{keyword}) || '%'
+                        OR UPPER(p.CONTENT) LIKE '%' || UPPER(#{keyword}) || '%' )
+                    </otherwise>
+                </choose>
+            </if>
+        </where>
+    </select>
+
+    <!-- 7) 페이징 처리된 목록 조회 (ROW_NUMBER 기반, 삭제글 제외) -->
+    <select id="selectNoticesByPage" parameterType="hashMap" resultMap="NoticePostResultMap">
+        SELECT
+        POST_ID,
+        ADMIN_ID,
+        CAT_CODE_ID,
+        CAT_CODE_NAME,
+        TITLE,
+        CONTENT,
+        VIEW_COUNT,
+        CREATED_AT,
+        UPDATED_AT,
+        FILE_GROUP_NO,
+        WRITER_NAME,
+        DEL_YN,
+        RNUM
+        FROM (
+        SELECT
+        p.POST_ID,
+        p.ADMIN_ID,
+        p.CAT_CODE_ID,
+        d.CODE_NAME AS CAT_CODE_NAME,
+        p.TITLE,
+        p.CONTENT,
+        p.VIEW_COUNT,
+        p.CREATED_AT,
+        p.UPDATED_AT,
+        p.FILE_GROUP_NO,
+        u.NAME AS WRITER_NAME,
+        p.DEL_YN,
+        ROW_NUMBER() OVER (ORDER BY p.CREATED_AT DESC) AS RNUM
+        FROM CS_NOTICE_POST p
+        JOIN USERS u ON p.ADMIN_ID = u.USER_ID
+        LEFT JOIN CODE_DETAIL d
+        ON d.CODE_GROUP_ID = 'NOTICETAG'
+        AND d.CODE_ID = p.CAT_CODE_ID
+        <where>
+            AND p.DEL_YN = 'N'
+            <if test="catCodeId != null and catCodeId != ''">
+                AND p.CAT_CODE_ID = #{catCodeId}
+            </if>
+            <if test="keyword != null and keyword != ''">
+                <choose>
+                    <when test="searchType == 'SC101'">
+                        AND ( UPPER(p.TITLE) LIKE '%' || UPPER(#{keyword}) || '%'
+                        OR UPPER(p.CONTENT) LIKE '%' || UPPER(#{keyword}) || '%' )
+                    </when>
+                    <when test="searchType == 'SC102'">
+                        AND UPPER(p.TITLE) LIKE '%' || UPPER(#{keyword}) || '%'
+                    </when>
+                    <when test="searchType == 'SC103'">
+                        AND UPPER(p.CONTENT) LIKE '%' || UPPER(#{keyword}) || '%'
+                    </when>
+                    <when test="searchType == 'SC104'">
+                        AND UPPER(u.NAME) LIKE '%' || UPPER(#{keyword}) || '%'
+                    </when>
+                    <otherwise>
+                        AND ( UPPER(p.TITLE) LIKE '%' || UPPER(#{keyword}) || '%'
+                        OR UPPER(p.CONTENT) LIKE '%' || UPPER(#{keyword}) || '%' )
+                    </otherwise>
+                </choose>
+            </if>
+        </where>
+        )
+        WHERE RNUM BETWEEN #{startRow} AND #{endRow}
+        ORDER BY RNUM
+    </select>
+
+    <!-- 8) 최근 공지 (삭제글 제외; 링크용으로 POST_ID 포함 권장) -->
+    <select id="selectRecentNotices" parameterType="int" resultType="map">
+        SELECT *
+        FROM (SELECT P.POST_ID, P.TITLE, P.CREATED_AT
+              FROM CS_NOTICE_POST P
+              WHERE P.DEL_YN = 'N'
+              ORDER BY P.CREATED_AT DESC)
+        WHERE ROWNUM &lt;= #{limit}
+    </select>
+
+    <!-- 9) 삭제: DEL_YN = 'Y' -->
+    <update id="deleteNotice" parameterType="int">
+        UPDATE CS_NOTICE_POST
+        SET DEL_YN     = 'Y',
+            UPDATED_AT = SYSDATE
+        WHERE POST_ID = #{postId}
+    </update>
+
+</mapper>

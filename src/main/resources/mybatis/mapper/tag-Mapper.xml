@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+    namespace는 TagMapper 인터페이스의 전체 경로와 일치해야 합니다.
+-->
+<mapper namespace="kr.or.ddit.common.tag.mapper.TagMapper">
+
+    <!--
+        [태그 UPSERT]
+        - MERGE 구문을 사용하여 TAGS 테이블에 태그가 존재하는지 확인합니다.
+        - 존재하지 않을 경우 (NOT MATCHED)에만 INSERT를 수행합니다.
+        - 태그 이름(TAG_NAME)은 대소문자를 구분하지 않고 비교하기 위해 UPPER 함수를 사용합니다.
+    -->
+    <insert id="upsertTag" parameterType="String">
+        MERGE INTO TAGS T
+        USING (SELECT #{tagName} AS TAG_NAME FROM DUAL) S
+        ON (UPPER(T.TAG_NAME) = UPPER(S.TAG_NAME))
+        WHEN NOT MATCHED THEN
+            INSERT (TAG_NAME, UPDATED_AT)
+            VALUES (#{tagName}, SYSDATE)
+    </insert>
+
+    <!--
+        [게시물-태그 연결 정보 INSERT]
+        - TAGS_POST_CON 테이블에 게시물과 태그를 연결하는 정보를 저장합니다.
+        - 파라미터로 Map을 사용하여 어떤 종류의 게시물(ENTITY_TYPE)이든 처리할 수 있도록 유연하게 설계합니다.
+    -->
+    <insert id="insertPostTag" parameterType="map">
+        INSERT INTO TAGS_POST_CON (
+            ENTITY_TYPE,
+            ENTITY_ID,
+            TAG_NAME,
+            CREATED_AT
+        ) VALUES (
+            #{entityType},
+            #{entityId},
+            #{tagName},
+            SYSDATE
+        )
+    </insert>
+
+</mapper>

@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper
+	namespace="kr.or.ddit.admin.openapi.mapper.AdminOpenApiMapper">
+
+
+<select id="selectApplicationCount" parameterType="map" resultType="int">
+    SELECT COUNT(A.APPLICATION_ID)
+    FROM API_APPLICATION A
+    JOIN USERS U ON A.USER_ID = U.USER_ID
+    JOIN API_SERVICE S ON A.API_ID = S.API_ID
+    LEFT JOIN CODE_DETAIL STAT ON A.STATUS = STAT.CODE_ID
+    <where>
+        <if test="keyword != null and keyword != ''">
+            AND (U.NAME LIKE '%' || #{keyword} || '%' OR S.API_NAME_KR LIKE '%' || #{keyword} || '%')
+        </if>
+        <if test="status != null and status != ''">
+            AND STAT.CODE_NAME = #{status}
+        </if>
+        </where>
+</select>
+
+
+
+
+<select id="selectApplicationList" parameterType="map" resultType="kr.or.ddit.admin.openapi.vo.ApiApplicationAdminVO">
+    SELECT B.*
+    FROM (
+        SELECT ROWNUM AS RNUM, A.*
+        FROM (
+            SELECT
+                APP.APPLICATION_ID, APP.API_ID, APP.USER_ID, 
+                STAT.CODE_NAME AS status,
+                APP.APPLICATED_AT,
+                U.NAME AS USER_NAME,
+                S.API_NAME_KR
+            FROM API_APPLICATION APP
+            JOIN USERS U ON APP.USER_ID = U.USER_ID
+            JOIN API_SERVICE S ON APP.API_ID = S.API_ID
+            LEFT JOIN CODE_DETAIL STAT ON APP.STATUS = STAT.CODE_ID
+            <where>
+                <if test="keyword != null and keyword != ''">
+                    AND (U.NAME LIKE '%' || #{keyword} || '%' OR S.API_NAME_KR LIKE '%' || #{keyword} || '%')
+                </if>
+                <if test="status != null and status != ''">
+                    AND STAT.CODE_NAME = #{status}
+                </if>
+                </where>
+            ORDER BY APP.APPLICATED_AT DESC
+        ) A
+    ) B
+    WHERE B.RNUM BETWEEN #{firstRecord} AND #{lastRecord}
+</select>
+
+
+
+<select id="selectApplicationStatusSummary" resultType="map">
+    SELECT
+        COUNT(*) AS TOTAL_COUNT,
+        COUNT(CASE WHEN STAT.CODE_NAME = '제출완료' THEN 1 END) AS PENDING_COUNT,
+        COUNT(CASE WHEN STAT.CODE_NAME = '승인' THEN 1 END) AS APPROVED_COUNT,
+        COUNT(CASE WHEN STAT.CODE_NAME = '반려' THEN 1 END) AS REJECTED_COUNT
+    FROM API_APPLICATION APP
+    JOIN CODE_DETAIL STAT ON APP.STATUS = STAT.CODE_ID
+</select>
+
+
+    
+
+	<select id="selectApplicationDetail" parameterType="long" resultType="kr.or.ddit.admin.openapi.vo.ApiApplicationAdminVO">
+        SELECT
+            APP.APPLICATION_ID, APP.API_ID, APP.USER_ID,
+            APP.STATUS AS statusCode,       -- 상태 ID는 statusCode 필드에 매핑
+            STAT.CODE_NAME AS status,       -- 상태 이름은 status 필드에 매핑
+            APP.APPLICATED_AT, APP.PURPOSE_DESC,
+            U.NAME AS USER_NAME,
+            S.API_NAME_KR
+        FROM API_APPLICATION APP
+        JOIN USERS U ON APP.USER_ID = U.USER_ID
+        JOIN API_SERVICE S ON APP.API_ID = S.API_ID
+        LEFT JOIN CODE_DETAIL STAT ON APP.STATUS = STAT.CODE_ID
+        WHERE APP.APPLICATION_ID = #{applicationId}
+    </select>
+    
+    <update id="updateApplicationStatus" parameterType="map">
+        UPDATE API_APPLICATION
+        SET STATUS = #{status}
+        WHERE APPLICATION_ID = #{applicationId}
+    </update>
+
+
+
+	<insert id="insertSubscription"
+		parameterType="kr.or.ddit.common.vo.openapi.ApiSubscriptionsVO">
+		INSERT INTO API_SUBSCRIPTIONS (
+		SUBSCRIPTION_ID, USER_ID, API_ID, APPLICATION_ID,
+		API_KEY, SECRET_KEY, STARTED_AT, EXPIRED_AT
+		) VALUES (
+		SEQ_API_SUBSCRIPTIONS_ID.NEXTVAL,
+		#{userId},
+		#{apiId},
+		#{applicationId},
+		#{apiKey},
+		#{secretKey},
+		SYSDATE,
+		#{expiredAt} 
+		)
+	</insert>
+
+</mapper>

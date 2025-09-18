@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.ddit.user.my.nthistory.mapper.MyNtHistoryMapper">
+
+    <resultMap id="NotificationMap" type="kr.or.ddit.notification.vo.UserNotifiedVO">
+        <id     property="notifyId"  column="NOTIFY_ID"/>
+        <result property="userId"     column="USER_ID"/>
+        <result property="message"    column="MESSAGE"/>
+        <result property="isRead"     column="IS_READ"/>
+        <result property="entityType" column="ENTITY_TYPE"/>
+        <result property="entityId"   column="ENTITY_ID"/>
+        <result property="targetUrl"  column="TARGET_URL"/>
+        <result property="createdAt"  column="CREATED_AT"/>
+        <result property="deletedAt"  column="DELETED_AT"/>
+    </resultMap>
+
+    <select id="selectTotalCount" parameterType="kr.or.ddit.user.my.nthistory.vo.MyNtHistoryVO" resultType="int">
+        SELECT
+            COUNT(*)
+        FROM
+            USER_NOTIFIED
+        WHERE
+            USER_ID = #{userId}
+            AND DELETED_AT IS NULL
+            <if test="startDate != null and !startDate.equals('')">
+                AND CREATED_AT >= TO_DATE(#{startDate}, 'YYYY-MM-DD')
+            </if>
+            <if test="endDate != null and !endDate.equals('')">
+                AND CREATED_AT &lt; TO_DATE(#{endDate}, 'YYYY-MM-DD') + 1
+            </if>
+    </select>
+
+    <select id="selectNotificationList" parameterType="kr.or.ddit.user.my.nthistory.vo.MyNtHistoryVO" resultMap="NotificationMap">
+        SELECT
+            B.*
+        FROM (
+            SELECT
+                A.*, ROWNUM AS RNUM
+            FROM (
+                SELECT
+                    NOTIFY_ID, USER_ID, MESSAGE, IS_READ, ENTITY_TYPE,
+                    ENTITY_ID, TARGET_URL, CREATED_AT, DELETED_AT
+                FROM
+                    USER_NOTIFIED
+                WHERE
+                    USER_ID = #{userId}
+                    AND DELETED_AT IS NULL
+                    <if test="startDate != null and !startDate.equals('')">
+                        AND CREATED_AT >= TO_DATE(#{startDate}, 'YYYY-MM-DD')
+                    </if>
+                    <if test="endDate != null and !endDate.equals('')">
+                        AND CREATED_AT &lt; TO_DATE(#{endDate}, 'YYYY-MM-DD') + 1
+                    </if>
+                ORDER BY
+                    CREATED_AT DESC
+            ) A
+        ) B
+        WHERE
+            B.RNUM BETWEEN #{startRow} AND #{endRow}
+    </select>
+
+</mapper>

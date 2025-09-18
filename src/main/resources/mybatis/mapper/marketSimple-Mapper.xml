@@ -1,0 +1,255 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+    namespace는 CodeMapper 인터페이스의 전체 경로와 정확히 일치해야 합니다.
+-->
+<mapper namespace="kr.or.ddit.market.simple.mapper.MarketMapper">
+	
+	<!-- 구 조회 -->
+    <select id="getDistrictList" resultType="kr.or.ddit.common.vo.code.CodeDistrictVO">
+        SELECT 
+            DISTRICT_ID 		AS districtId,
+            DISTRICT_ADM_CODE 	AS districtAdmCode,
+            DISTRICT_NAME 		AS districtName,
+            DISTRICT_EDM_CODE 	AS districtEdmCode
+        FROM 
+            CODE_DISTRICT
+    </select>
+	
+	<!-- 업종 조회(대분류) -->
+	<select id="getBizCodeList" resultType="kr.or.ddit.common.vo.code.CodeBizVO">
+        SELECT 
+            BIZ_CODE_ID     AS bizCodeId,    
+            BIZ_NAME        AS bizName,
+            BIZ_LEVEL       AS bizLevel,
+            PARENT_CODE_ID  AS parentCodeId
+        FROM 
+            CODE_BIZ
+        WHERE 
+            BIZ_LEVEL = 1
+        ORDER BY 
+            BIZ_CODE_ID
+    </select>
+	
+	<!-- 업종 조회(중분류) -->
+	<select id="findSubCodeBizByParentId" parameterType="String" resultType="kr.or.ddit.common.vo.code.CodeBizVO">
+        SELECT 
+            BIZ_CODE_ID     AS bizCodeId,    
+            BIZ_NAME        AS bizName,
+            BIZ_LEVEL       AS bizLevel,
+            PARENT_CODE_ID  AS parentCodeId
+        FROM 
+            CODE_BIZ
+        WHERE 
+            BIZ_LEVEL = 2
+            AND PARENT_CODE_ID = #{parentCodeId}
+        ORDER BY 
+            BIZ_NAME
+    </select>
+	
+	<!-- 행정동 조회 -->
+	<select id="selectAdmDongList" parameterType="int" resultType="kr.or.ddit.common.vo.code.CodeAdmDongVO">
+        SELECT 
+            ADM_CODE, 
+            ADM_NAME, 
+            DISTRICT_ID
+        FROM 
+            CODE_ADM_DONG
+        WHERE 
+            DISTRICT_ID = #{districtId}
+        ORDER BY
+        	ADM_NAME
+    </select>
+	
+	<!-- 분석 부분 -->
+	<select id="getBusinessStats" parameterType="map" resultType="kr.or.ddit.common.vo.stats.StatsBizLargeVO">
+        <choose>
+            <when test="bizLevel == 1">
+                SELECT ADM_CODE, STATS_YEAR, SGIS_CODE, BIZ_CODE_ID, STATS_VALUE
+                FROM STATS_BIZ_LARGE
+            </when>
+            <when test="bizLevel == 2">
+                SELECT ADM_CODE, STATS_YEAR, SGIS_CODE, BIZ_CODE_ID, STATS_VALUE
+                FROM STATS_BIZ_MEDIUM
+            </when>
+        </choose>
+        <where>
+            <if test="year != null and year != ''">
+                AND STATS_YEAR = #{year}
+            </if>
+            <if test="admCode != null and admCode != ''">
+                AND ADM_CODE LIKE #{admCode} || '%'
+            </if>
+            <if test="bizCodeId != null and bizCodeId != ''">
+                AND BIZ_CODE_ID = #{bizCodeId}
+            </if>
+        </where>
+    </select>
+    
+    <select id="getEmployeeStats" parameterType="map" resultType="kr.or.ddit.common.vo.stats.StatsEmpLargeVO">
+        <choose>
+            <when test="bizLevel == 1">
+                SELECT ADM_CODE, STATS_YEAR, SGIS_CODE, BIZ_CODE_ID, STATS_VALUE
+                FROM STATS_EMP_LARGE
+            </when>
+            <when test="bizLevel == 2">
+                SELECT ADM_CODE, STATS_YEAR, SGIS_CODE, BIZ_CODE_ID, STATS_VALUE
+                FROM STATS_EMP_MEDIUM
+            </when>
+        </choose>
+        <where>
+            <if test="year != null and year != ''">
+                AND STATS_YEAR = #{year}
+            </if>
+            <if test="admCode != null and admCode != ''">
+                AND ADM_CODE LIKE #{admCode} || '%'
+            </if>
+            <if test="bizCodeId != null and bizCodeId != ''">
+                AND BIZ_CODE_ID = #{bizCodeId}
+            </if>
+        </where>
+    </select>
+    
+    <select id="getCreditCardStats" parameterType="map" resultType="kr.or.ddit.common.vo.stats.StatsCreditCardVO">
+        SELECT ADM_CODE, STATS_YEAR, AVG_PAYMENT_AMOUNT
+        FROM STATS_CREDIT_CARD
+        <where>
+            <if test="year != null and year != ''">
+                AND STATS_YEAR = #{year}
+            </if>
+            <if test="admCode != null and admCode != ''">
+                AND ADM_CODE LIKE #{admCode} || '%'
+            </if>
+        </where>
+    </select>
+    
+    <select id="getHouseholdStats" parameterType="map" resultType="kr.or.ddit.common.vo.stats.StatsHouseholdVO">
+        SELECT ADM_CODE, STATS_YEAR, SGIS_CODE, STATS_VALUE
+        FROM STATS_HOUSEHOLD
+        <where>
+            <if test="year != null and year != ''">
+                AND STATS_YEAR = #{year}
+            </if>
+            <if test="admCode != null and admCode != ''">
+                AND ADM_CODE LIKE #{admCode} || '%'
+            </if>
+        </where>
+    </select>
+
+    <select id="getHousingStats" parameterType="map" resultType="kr.or.ddit.common.vo.stats.StatsHousingVO">
+        SELECT ADM_CODE, STATS_YEAR, SGIS_CODE, STATS_VALUE
+        FROM STATS_HOUSING
+        <where>
+            <if test="year != null and year != ''">
+                AND STATS_YEAR = #{year}
+            </if>
+            <if test="admCode != null and admCode != ''">
+                AND ADM_CODE LIKE #{admCode} || '%'
+            </if>
+        </where>
+    </select>
+
+    <select id="getPopulationStats" parameterType="map" resultType="kr.or.ddit.common.vo.stats.StatsPopulationVO">
+        SELECT ADM_CODE, STATS_YEAR, SGIS_CODE, STATS_VALUE
+        FROM STATS_POPULATION
+        <where>
+            <if test="year != null and year != ''">
+                AND STATS_YEAR = #{year}
+            </if>
+            <if test="admCode != null and admCode != ''">
+                AND ADM_CODE LIKE #{admCode} || '%'
+            </if>
+        </where>
+    </select>
+	
+	<!-- 분석 결과 조회시_분석 행정동 정보 및 업종 정보 조회 -->
+	<select id="selectLocationNames" parameterType="String" resultType="map">
+		SELECT 
+		    A.ADM_NAME, 
+		    B.DISTRICT_NAME
+		FROM 
+		    CODE_ADM_DONG A
+		JOIN 
+		    CODE_DISTRICT B ON SUBSTR(A.ADM_CODE, 1, 5) = B.DISTRICT_ADM_CODE
+		WHERE 
+		    A.ADM_CODE = #{admCode}
+	</select>
+	
+	<!-- 7. 분석결과 해석 관련 마스터코드 디테일 조회 -->
+	<select id="getSgisCodeDetailList" resultType="kr.or.ddit.common.code.vo.CodeDetailVO">
+		SELECT 
+            CODE_ID 		AS codeId, 
+            CODE_GROUP_ID 	AS codeGroupId, 
+            CODE_NAME 		AS codeName, 
+            USE_YN 			AS useYn
+		FROM 
+            CODE_DETAIL
+		WHERE 
+            CODE_GROUP_ID = 'SGISCODE'
+	</select>
+	
+	<!-- 8. 분석결과 신용카드 구 단위 평균 매출 조회 -->
+	<select id="getAvgPaymentByDistrict" parameterType="map" resultType="map">
+        SELECT 
+            d.DISTRICT_NAME,
+            TRUNC(AVG(s.AVG_PAYMENT_AMOUNT)) AS AVG_PAYMENT
+        FROM 
+            STATS_CREDIT_CARD s
+        JOIN 
+            CODE_DISTRICT d ON SUBSTR(s.ADM_CODE, 1, 5) = d.DISTRICT_ADM_CODE
+        WHERE 
+            SUBSTR(s.ADM_CODE, 1, 5) = SUBSTR(#{admCode}, 1, 5)
+            AND s.STATS_YEAR = #{year}
+        GROUP BY 
+            d.DISTRICT_NAME
+    </select>
+	
+	<!-- 9. 전체 신용카드 소비 평균 조회 -->
+	<select id="getTotalAvgPayment" resultType="int">
+        SELECT 
+            TRUNC(AVG(AVG_PAYMENT_AMOUNT))
+        FROM 
+            STATS_CREDIT_CARD
+        WHERE 
+            AVG_PAYMENT_AMOUNT &lt;&gt; 0
+    </select>
+    
+    <select id="selectUserPreferences" parameterType="String" resultType="kr.or.ddit.market.simple.vo.UserPreferenceVO">
+    WITH PREFERENCES AS (
+        SELECT
+            UMD.USER_ID,
+            (SELECT CAD.DISTRICT_ID FROM CODE_ADM_DONG CAD WHERE CAD.ADM_CODE = UMD.ADM_CODE) AS DISTRICT_ID,
+            UMD.ADM_CODE,
+            NULL AS PARENT_BIZ_CODE_ID,
+            NULL AS BIZ_CODE_ID,
+            UMD.CREATED_AT
+        FROM USER_MY_DISTRICT UMD
+        WHERE UMD.USER_ID = #{userId}
+        UNION ALL
+        SELECT
+            UMB.USER_ID,
+            NULL AS DISTRICT_ID,
+            NULL AS ADM_CODE,
+            (SELECT CB.PARENT_CODE_ID FROM CODE_BIZ CB WHERE CB.BIZ_CODE_ID = UMB.BIZ_CODE_ID) AS PARENT_BIZ_CODE_ID,
+            UMB.BIZ_CODE_ID,
+            UMB.CREATED_AT
+        FROM USER_MY_BIZ UMB
+        WHERE UMB.USER_ID = #{userId}
+    ), LATEST_PREFS AS (
+        SELECT
+            MAX(CASE WHEN ADM_CODE IS NOT NULL THEN CREATED_AT END) as LATEST_DISTRICT_DATE,
+            MAX(CASE WHEN BIZ_CODE_ID IS NOT NULL THEN CREATED_AT END) as LATEST_BIZ_DATE
+        FROM PREFERENCES
+    )
+    SELECT
+        MAX(P.DISTRICT_ID) AS districtId,
+        MAX(P.ADM_CODE) AS admCode,
+        MAX(P.PARENT_BIZ_CODE_ID) AS parentBizCodeId,
+        MAX(P.BIZ_CODE_ID) AS bizCodeId
+    FROM PREFERENCES P, LATEST_PREFS LP
+    WHERE P.CREATED_AT = LP.LATEST_DISTRICT_DATE OR P.CREATED_AT = LP.LATEST_BIZ_DATE
+</select>
+	
+	
+	
+</mapper>

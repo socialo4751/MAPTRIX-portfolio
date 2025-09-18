@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.ddit.attraction.point.mapper.PointMapper">
+
+	<update id="updatePoint" parameterType="hashMap">
+		MERGE INTO ST_USER_POINT target
+		USING (
+		    SELECT 
+		    	#{userId} AS USER_ID,
+		    	#{pointsToAdd} AS ADD_POINTS FROM DUAL
+		) source
+		ON (target.USER_ID = source.USER_ID)
+		WHEN MATCHED THEN
+		    UPDATE SET target.TOTAL_POINT = target.TOTAL_POINT + source.ADD_POINTS
+		WHEN NOT MATCHED THEN
+		    INSERT (
+		    	target.USER_ID,
+		    	target.TOTAL_POINT
+		    )
+		    VALUES (
+		    	source.USER_ID,
+		    	source.ADD_POINTS
+		    )
+	</update>
+
+	<insert id="insertDistanceClaim" parameterType="hashMap">
+		INSERT INTO ST_USER_DISTANCE_CLAIM(
+			CLAIM_ID,
+			USER_ID,
+			CLAIMED_DISTANCE,
+			CLAIMED_POINT,
+			CREATED_AT
+        )
+        VALUES(
+        	SEQ_ST_DISTANCE_CLAIM.NEXTVAL,
+        	#{userId},
+        	#{claimKm},
+        	#{pointsToAdd},
+        	SYSDATE
+        )
+	</insert>
+	
+	<insert id="insertPointHistory" parameterType="hashMap">
+		INSERT INTO ST_USER_POINT_HISTORY(
+			POINT_LOG_HISTORY_ID,
+			USER_ID,
+			CHANGE_AMOUNT,
+			TOTAL_AFTER,
+			DESCRIPTION,
+			CREATED_AT,
+			CHANGE_TYPE
+        )
+        VALUES(
+        	SEQ_ST_USER_POINT_HISTORY.NEXTVAL,
+        	#{userId},
+        	#{changeAmount},
+        	#{totalAfterPoint},
+        	#{description},
+        	SYSDATE,
+        	#{changeType}
+        )
+	</insert>
+	
+	<select id="getTotalPoint" resultType="Integer" parameterType="String">
+		SELECT
+		    NVL((
+		        SELECT TOTAL_POINT
+		        FROM ST_USER_POINT
+		        WHERE USER_ID = #{userId}
+		    ), 0) AS TOTAL_POINT
+		FROM dual
+	</select>
+	
+    <select id="getPointLog" resultType="kr.or.ddit.attraction.point.vo.StUserPointHistoryVO" parameterType="kr.or.ddit.attraction.point.vo.StUserPointHistoryVO">
+    	SELECT
+    		POINT_LOG_HISTORY_ID,
+    		USER_ID,
+    		CHANGE_AMOUNT,
+    		TOTAL_AFTER,
+    		DESCRIPTION,
+    		CREATED_AT,
+    		CHANGE_TYPE
+    	FROM
+    		ST_USER_POINT_HISTORY
+    	WHERE
+    		USER_ID = #{userId}
+    </select>
+    
+    <!-- 사용하지 않는 쿼리 (주석 처리) -->
+    <!-- 
+	<select id="getTodayTotalDistance" parameterType="int" resultType="int">
+        SELECT COALESCE(SUM(walk_distance), 0)
+        FROM user_stamps
+        WHERE user_id = #{userId}
+          AND DATE(created_at) = CURDATE()
+    </select>
+    
+    <insert id="insertPoint" parameterType="HashMap">
+        INSERT INTO user_stamps (user_id, walk_distance, points_earned, created_at, request_uuid)
+        VALUES (#{userId}, #{walkDistance}, #{pointsEarned}, NOW(), #{requestUuid})
+    </insert>
+
+    <select id="existsByRequestUuid" parameterType="string" resultType="boolean">
+        SELECT COUNT(*) > 0
+        FROM user_stamps
+        WHERE request_uuid = #{requestUuid}
+    </select>
+    -->
+</mapper>

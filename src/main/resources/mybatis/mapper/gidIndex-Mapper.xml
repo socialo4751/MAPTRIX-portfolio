@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.ddit.admin.stats.market.geo.GidIndexMapper">
+
+  <resultMap id="GidIndexMap" type="kr.or.ddit.admin.stats.market.geo.GidIndexVO">
+    <id     property="gid"        column="GRID_ID"/>
+    <result property="admCode"    column="ADM_CODE"/>
+    <result property="districtId" column="DISTRICT_ID"/>
+  </resultMap>
+
+  <select id="findByGridId" parameterType="string" resultMap="GidIndexMap">
+    SELECT GRID_ID, ADM_CODE, DISTRICT_ID
+      FROM DA_GRID
+     WHERE GRID_ID = #{gid}
+  </select>
+</mapper>

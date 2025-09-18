@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.ddit.cs.praise.mapper.OrgPraisePostMapper">
+    <resultMap id="praisePostMap" type="kr.or.ddit.cs.praise.vo.OrgPraisePostVO">
+        <id property="praiseId" column="PRAISE_ID"/>
+        <result property="userId" column="USER_ID"/>
+        <result property="empId" column="EMP_ID"/>
+        <result property="title" column="TITLE"/>
+        <result property="content" column="CONTENT"/>
+        <result property="createdAt" column="CREATED_AT"/>
+        <result property="isDeleted" column="IS_DELETED"/>
+        <!-- 화면용 -->
+        <result property="userName" column="WRITER_NAME"/>
+        <result property="empName" column="EMP_NAME"/>
+    </resultMap>
+
+    <select id="selectPraiseList" resultMap="praisePostMap">
+        SELECT
+        p.praise_id,
+        p.user_id,
+        p.emp_id,
+        p.title,
+        p.content,
+        p.created_at,
+        p.is_deleted,
+        u1.name AS WRITER_NAME,
+        u2.name AS EMP_NAME
+        FROM ORG_PRAISE_POST p
+        JOIN USERS u1 ON p.user_id = u1.user_id
+        JOIN USERS u2 ON p.emp_id = u2.user_id
+        <where>
+            <if test="empName != null and empName.trim() != ''">
+                AND u2.name LIKE '%' || #{empName} || '%'
+            </if>
+            AND p.is_deleted = 'N'
+        </where>
+        ORDER BY p.created_at DESC
+    </select>
+
+    <insert id="insertPraise" parameterType="kr.or.ddit.cs.praise.vo.OrgPraisePostVO">
+        <selectKey keyProperty="praiseId" resultType="long" order="BEFORE">
+            SELECT SEQ_ORG_PRAISE_POST_ID.NEXTVAL
+            FROM DUAL
+        </selectKey>
+
+        INSERT INTO ORG_PRAISE_POST
+        (praise_id, user_id, emp_id, title, content, created_at)
+        VALUES
+        (#{praiseId}, #{userId}, #{empId}, #{title}, #{content}, SYSDATE)
+    </insert>
+
+    <select id="selectAllEmployees" resultType="kr.or.ddit.intro.org.vo.OrgEmpVO">
+        SELECT e.emp_id AS empId,
+               u.name   AS empName
+        FROM org_emp e
+                 JOIN users u ON e.emp_id = u.user_id
+        ORDER BY u.name
+    </select>
+
+    <select id="selectPraiseCount" resultType="int" parameterType="string">
+        SELECT COUNT(*)
+        FROM ORG_PRAISE_POST p
+        JOIN USERS u2 ON p.emp_id = u2.user_id
+        <where>
+            <if test="empName != null and empName.trim() != ''">
+                AND u2.name LIKE '%' || #{empName} || '%'
+            </if>
+            AND p.is_deleted = 'N'
+        </where>
+    </select>
+
+    <!-- 1-2) 페이징: OFFSET / FETCH 사용 (Oracle 12c 이상) -->
+    <select id="selectPraisePage" resultMap="praisePostMap" parameterType="map">
+        SELECT
+        rn,
+        praise_id,
+        user_id,
+        emp_id,
+        title,
+        content,
+        created_at,
+        is_deleted,
+        WRITER_NAME,
+        EMP_NAME
+        FROM (
+        SELECT /*+ FIRST_ROWS(n) */
+        ROW_NUMBER() OVER (ORDER BY p.created_at DESC) AS rn,
+        p.praise_id,
+        p.user_id,
+        p.emp_id,
+        p.title,
+        p.content,
+        p.created_at,
+        p.is_deleted,
+        u1.name AS WRITER_NAME,
+        u2.name AS EMP_NAME
+        FROM ORG_PRAISE_POST p
+        JOIN USERS u1 ON p.user_id = u1.user_id
+        JOIN USERS u2 ON p.emp_id = u2.user_id
+        <where>
+            <if test="empName != null and empName.trim() != ''">
+                AND u2.name LIKE '%' || #{empName} || '%'
+            </if>
+            AND p.is_deleted = 'N'
+        </where>
+        )
+        WHERE rn BETWEEN #{start}+1 AND #{start}+#{size}
+    </select>
+    <update id="markPraiseAsDeleted" parameterType="long">
+        UPDATE ORG_PRAISE_POST
+        SET is_deleted = 'Y'
+        WHERE praise_id = #{praiseId}
+    </update>
+    <!-- 직원 이름 키워드 검색 (상위 N건) -->
+    <select id="searchEmployeesByKeyword" resultType="kr.or.ddit.intro.org.vo.OrgEmpVO" parameterType="map">
+        SELECT *
+        FROM (
+        SELECT e.emp_id AS empId,
+        u.name AS empName
+        FROM org_emp e
+        JOIN users u ON e.emp_id = u.user_id
+        <where>
+            <if test="keyword != null and keyword.trim() != ''">
+                AND UPPER(u.name) LIKE '%' || UPPER(#{keyword}) || '%'
+            </if>
+        </where>
+        ORDER BY u.name
+        )
+        WHERE ROWNUM &lt;= #{limit}
+    </select>
+
+</mapper>

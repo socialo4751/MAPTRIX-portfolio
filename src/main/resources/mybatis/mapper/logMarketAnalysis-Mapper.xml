@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.ddit.admin.stats.market.mapper.LogMarketAnalysisMapper">
+	<!-- 트리거/디폴트로 채워지는 칼럼: ANALYSIS_ID, DISTRICT_ID, GENDER, AGE_BAND, RUN_AT -->
+    <insert id="insertMarketAnalysisLog" parameterType="kr.or.ddit.admin.stats.market.vo.LogMarketAnalysisVO">
+        INSERT INTO LOG_MARKET_ANALYSIS (
+            USER_ID,
+            ANALYSIS_TYPE,
+            ADM_CODE,
+            BIZ_CODE_ID,
+            CHANNEL,
+            CLIENT_IP,
+            GEOM_WKT,
+            PARAM_JSON,
+            CONTEXT_JSON,
+            RESULT_ROWS,
+            DURATION_MS,
+            STATUS
+        ) VALUES (
+            #{userId},
+            #{analysisType},
+            #{admCode},
+            #{bizCodeId},
+            #{channel},
+            #{clientIp},
+            #{geomWkt},
+            #{paramJson,jdbcType=CLOB}, 
+            #{contextJson,jdbcType=CLOB},
+            #{resultRows},
+            #{durationMs},
+            #{status}
+        )
+    </insert>
+
+</mapper>
