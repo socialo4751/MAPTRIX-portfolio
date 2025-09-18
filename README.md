@@ -16,12 +16,13 @@
 - Chart.js (데이터 시각화)
 
 ### Backend
-- Python Django / Flask
-- Node.js
+- **Spring Framework** (Spring MVC)
+- **MyBatis** (ORM)
+- **Java 8+**
 
 ### Database
-- MySQL / PostgreSQL
-- MongoDB (빅데이터 저장)
+- **Oracle Database** (메인 데이터베이스)
+- **Oracle SQL Developer** (데이터베이스 관리 도구)
 
 ### AI/ML
 - Python (Pandas, NumPy, Scikit-learn)
@@ -29,10 +30,9 @@
 - 군집분석 알고리즘
 
 ### API & External Services
-- Google Maps API / Kakao Map API
-- 공공데이터포털 API
-- SNS API (키워드 분석)
-- 상권정보 Open API
+- **Kakao Map API** (지도 서비스)
+- **공공데이터포털 API** (상권정보)
+- **상권정보 Open API**
 
 ### Tools
 - Git, GitHub
@@ -64,19 +64,71 @@
 
 ## 🚀 실행 방법
 
+### 📋 사전 준비사항
+- **Java 8** 이상
+- **Spring Tool Suite (STS)** 또는 **Eclipse**
+- **Apache Tomcat 8.5** 이상
+- **Oracle Database** (Oracle SQL Developer)
+- **Maven** (의존성 관리)
+- **Kakao Map API Key**
+
+### 🔧 실행 단계
+
+#### 1. 프로젝트 다운로드
 ```bash
-# 저장소 클론
 git clone https://github.com/socialo4751/MAPTRIX-portfolio.git
-
-# 프로젝트 디렉토리로 이동
-cd MAPTRIX-portfolio
-
-# 의존성 설치
-pip install -r requirements.txt
-
-# 서버 실행
-python manage.py runserver
 ```
+
+#### 2. STS에서 프로젝트 Import
+1. **File** → **Import** → **Existing Maven Projects**
+2. 다운로드한 프로젝트 폴더 선택
+3. **Import** 클릭
+
+#### 3. Oracle Database 설정
+```sql
+-- Oracle SQL Developer에서 스키마 생성
+CREATE USER maptrix IDENTIFIED BY password;
+GRANT CONNECT, RESOURCE TO maptrix;
+```
+
+#### 4. 설정 파일 수정
+```properties
+# src/main/resources/application.properties 또는 database.properties
+spring.datasource.driver-class-name=oracle.jdbc.driver.OracleDriver
+spring.datasource.url=jdbc:oracle:thin:@localhost:1521:XE
+spring.datasource.username=maptrix
+spring.datasource.password=your_password
+
+# Kakao Map API 설정
+kakao.api.key=your_kakao_api_key
+```
+
+#### 5. Maven 의존성 업데이트
+```bash
+# STS 내에서 프로젝트 우클릭
+# Maven → Reload Projects
+```
+
+#### 6. 서버 실행
+- **프로젝트 우클릭** → **Run As** → **Spring Boot App**
+- 또는 **Run As** → **Run on Server** (Tomcat)
+
+#### 7. 브라우저 접속
+```
+http://localhost
+```
+
+### 🔑 API 키 설정 방법
+
+#### Kakao Map API 키 발급
+1. [Kakao Developers](https://developers.kakao.com/) 접속
+2. 애플리케이션 등록 후 JavaScript 키 발급
+3. 플랫폼 설정에서 도메인 등록 (`http://localhost`)
+
+### 💡 참고사항
+- Oracle Database 연결 확인 필요
+- 카카오 API 키는 보안상 별도 설정 파일로 관리 권장
+- 포트 80 사용으로 관리자 권한이 필요할 수 있음
 
 ## 📸 스크린샷
 
@@ -146,7 +198,9 @@ python manage.py runserver
 - **지속가능한 데이터 생태계** 구축
 
 ## 🔗 링크
+
 - **기술 문서**: [https://delicate-dirt-4ca.notion.site/26408ffbb3b6806cba61c30f2b049d45?v=26408ffbb3b6819f8656000c74f54ede]
+
 
 
 ## 📝 개발 후기
@@ -160,7 +214,7 @@ python manage.py runserver
 ---
 
 ## 🏆 Awards & Recognition
-- [공모전 우수상]
+- [최종프로젝트 공모전 우수상]
 
 ---
 
